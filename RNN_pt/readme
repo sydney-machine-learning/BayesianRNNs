@@ -1,3 +1,7 @@
 this is working fine and great
 
 DO NOT DISTURB
+
+rnn_pt.py is code made using numpy only. RNN network is made from scratch using only numpy as python library.
+
+rnn_all_pt uses torch to built rnn network.

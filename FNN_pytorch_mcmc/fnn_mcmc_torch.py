@@ -108,23 +108,18 @@ class NN:
 
     def __init__(self,topo,lrate,x,y):
         # Defining input size, hidden layer size, output size and batch size respectively
-        self.n_in,self.n_h, self.n_out, self.batch_size = topo[0], topo[1], topo[2], 50
+        self.n_in,self.n_h, self.n_out, self.batch_size = topo[0], topo[1], topo[2], 1
         # Create dummy input and target tensors (data)
-        #x = torch.randn(batch_size, n_in)
-        #y = torch.tensor([[1.0], [0.0], [0.0], [1.0], [1.0], [1.0], [0.0], [0.0], [1.0], [1.0]])
-
         #pt_tensor_from_list = torch.FloatTensor(py_list)
         self.x = torch.FloatTensor(x)
         self.y = torch.FloatTensor(y)
         self.learnRate = lrate
-        print('hi')
+        print('FNN model')
         # Create a model
         self.model = nn.Sequential(nn.Linear(self.n_in, self.n_h),
                                    nn.Sigmoid(),
                                    nn.Linear(self.n_h, self.n_out),
                                    nn.Sigmoid())
-
-
 
     def evaluate_proposal(self,x,w=None):
         x = torch.FloatTensor(x)
@@ -139,79 +134,40 @@ class NN:
             return copy.deepcopy(y_pred.detach().numpy())
 
 
-#    def loss(self,fx,y):
-#        fx = torch.FloatTensor(fx)
-#        y = torch.FloatTensor(y)
-#        criterion = nn.MSELoss()
-#        loss = criterion(fx,y)
-#        return loss.item()
-
-
     #returns a np arraylist of weights and biases -- layerwise
     # in order i.e. weight and bias of input and hidden then weight and bias for hidden to out
     def getparameters(self,w = None):
         l=np.array([1,2])
         dic = {}
         if w is None:
-            dic = self.model.state_dict()
+            dic = self.state_dict()
         else:
-            dic = w
-        for name in dic.keys():
-            l=np.concatenate((l.reshape(-1,1),(copy.deepcopy(dic[name])).numpy().reshape(-1,1)))
+            dic = copy.deepcopy(w)
+        for name in sorted(dic.keys()):
+            l=np.concatenate((l,np.array(copy.deepcopy(dic[name])).reshape(-1)),axis=None)
         l = l[2:]
         return l
 
     # input a dictionary of same dimensions
     def loadparameters(self,param):
         self.model.load_state_dict(param)
-#        for name in (self.model.state_dict().keys()):
-#            #print(param[name])
-#            self.model.state_dict()[name] = param[name]
 
-    def addnoiseandcopy(self,mea,std_dev):
-        dict = {}
-        for name in (self.model.state_dict().keys()):
-            dict[name] = copy.deepcopy(self.model.state_dict()[name]) + torch.zeros(self.model.state_dict()[name].size()).normal_(mean = mea, std = std_dev)
-        return dict
-
-## Construct the loss function
-#criterion = torch.nn.MSELoss()
-#
-## Construct the optimizer (Stochastic Gradient Descent in this case)
-#optimizer = torch.optim.SGD(model.parameters(), lr=0.05)
-## Gradient Descent
-#for epoch in range(5):
-#    # Forward pass: Compute predicted y by passing x to the model
-#    y_pred = model(x)
-#
-#    # Compute and print loss
-#    loss = criterion(y_pred, y)
-#    print('epoch: ', epoch,' loss: ', loss.item())
-#
-#    # Zero gradients, perform a backward pass, and update the weights.
-#    optimizer.zero_grad()
-#
-#    # perform a backward pass (backpropagation)
-#    loss.backward()
-#
-#    # Update the parameters
-#    #optimizer.step()
-#
-#
-#model.parameters()
-#
-#
-#params = list(model.parameters())
-#print(len(params))
-#print(params[0].size())
-#
-#w1 = []
-#for name, param in model.named_parameters():
-#    if param.requires_grad:
-#        #print(name, param.data)
-#        w1 = param.data
-#        break
-#
+    def dictfromlist(self,param):
+        dic = {}
+        i=0
+        for name in sorted(self.state_dict().keys()):
+            dic[name] = torch.FloatTensor(param[i:i+(self.state_dict()[name]).view(-1).shape[0]]).view(self.state_dict()[name].shape)
+            i += (self.state_dict()[name]).view(-1).shape[0]
+        #self.loadparameters(dic)
+        return dic
+        
+        
+    # input weight dictionary, mean, std dev
+    def addnoiseandcopy(self,w,mea,std_dev):
+        dic = {}
+        for name in (w.keys()):
+            dic[name] = copy.deepcopy(w[name]) + torch.zeros(w[name].size()).normal_(mean = mea, std = std_dev)
+        return dic
 
 class MCMC:
     def __init__(self, samples, learnrate, train_x, train_y,test_x,test_y, topology):
@@ -339,7 +295,7 @@ class MCMC:
             #print(i)
 
             #w_proposal = w + np.random.normal(0, step_w, w_size)
-            w_proposal = neuralnet.addnoiseandcopy(0,step_w) # adding gaussian normal distributed noise to all weights and all biases
+            w_proposal = neuralnet.addnoiseandcopy(w,0,step_w) # adding gaussian normal distributed noise to all weights and all biases
 
             eta_pro = eta + np.random.normal(0, step_eta, 1)
             tau_pro = math.exp(eta_pro)
@@ -436,7 +392,7 @@ def main():
         #print(traindata)
         Hidden = 5
         topology = [Input, Hidden, Output]
-        numSamples = 5000  # need to decide yourself
+        numSamples = 10000  # need to decide yourself
 
         mcmc = MCMC(numSamples,learnRate,train_x,train_y,test_x,test_y, topology)  # declare class
 
