@@ -133,11 +133,11 @@ class Model(nn.Module):
         for i,sample in enumerate(x):
             sample = torch.FloatTensor(sample).view(sample.shape[0],1,self.topo[0])
             hidden = copy.deepcopy(self.hidden)
+            optimizer.zero_grad()
             out, h1 = self.rnn(sample, hidden)
             out = self.fc(out[-1])
             out = self.sigmoid(out)
             loss = criterion(out,torch.FloatTensor(y[i]).view(out.shape))
-            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
         return copy.deepcopy(self.state_dict())
