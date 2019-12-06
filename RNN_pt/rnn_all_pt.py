@@ -20,7 +20,7 @@ import copy
 import argparse
 import time
 #np.random.seed(1)
-
+import datetime
 import multiprocessing
 import gc
 import matplotlib as mpl
@@ -36,7 +36,7 @@ parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 
 
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=50000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.02,type=float)
@@ -371,7 +371,7 @@ class ptReplica(multiprocessing.Process):
                 acc_train[i+1,] = acc_train[i,]
                 acc_test[i+1,] = acc_test[i,]
             
-            if i%500 == 0:
+            if i%20 == 0:
                 print(i,rmsetrain,rmsetest, 'ith sample')
 
             if (i % self.swap_interval == 0 and i != 0 ):
@@ -647,6 +647,7 @@ class ParallelTempering:
             if count == self.num_chains:
                 break
             print("Waiting")
+            print(datetime.datetime.now())
             timeout_count = 0
             for index in range(0,self.num_chains):
                 print("Waiting for chain: {}".format(index+1))
@@ -889,344 +890,349 @@ def load_horizontal(fname):
 
 
 def main():
-    for j in range(2, 16) :
-        print(j, ' out of 15','\n\n\n\n\n\n\n')
-        i = j//2
-        problem =	i
-        if problem ==	1:
-            #traindata = np.loadtxt("Data_OneStepAhead/Lazer/train.txt")
-            #testdata	= np.loadtxt("Data_OneStepAhead/Lazer/test.txt")	#
-            name	= "Lazer"
-            x,y = load_horizontal("Data_OneStepAhead/Lazer/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/Lazer/test.txt")
 
-        if problem ==	2:
-            #traindata = np.loadtxt(  "Data_OneStepAhead/Sunspot/train.txt")
-            #testdata	= np.loadtxt( "Data_OneStepAhead/Sunspot/test.txt")	#
-            name	= "Sunspot"
-            x,y = load_horizontal("Data_OneStepAhead/Sunspot/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/Sunspot/test.txt")
 
-
-        if problem ==	3:
-            ##traindata = np.loadtxt("Data_OneStepAhead/Mackey/train.txt")
-            #testdata	= np.loadtxt("Data_OneStepAhead/Mackey/test.txt")  #
-            name	= "Mackey"
-            x,y = load_horizontal("Data_OneStepAhead/Mackey/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/Mackey/test.txt")
-
-        if problem ==	4:
-            #traindata = np.loadtxt("Data_OneStepAhead/Lorenz/train.txt")
-            #testdata	= np.loadtxt("Data_OneStepAhead/Lorenz/test.txt")  #
-            name	= "Lorenz"
-            x,y = load_horizontal("Data_OneStepAhead/Lorenz/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/Lorenz/test.txt")
-
-        if problem ==	5:
-            #traindata = np.loadtxt( "Data_OneStepAhead/Rossler/train.txt")
-            #testdata	= np.loadtxt( "Data_OneStepAhead/Rossler/test.txt")	#
-            name	= "Rossler"
-            x,y = load_horizontal("Data_OneStepAhead/Rossler/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/Rossler/test.txt")
-
-        if problem ==	6:
-            #traindata = np.loadtxt("Data_OneStepAhead/Henon/train.txt")
-            #testdata	= np.loadtxt("Data_OneStepAhead/Henon/test.txt")	#
-            name	= "Henon"
-            x,y = load_horizontal("Data_OneStepAhead/Henon/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/Henon/test.txt")
-
-        if problem ==	7:
-            #traindata = np.loadtxt("Data_OneStepAhead/ACFinance/train.txt")
-            #testdata	= np.loadtxt("Data_OneStepAhead/ACFinance/test.txt")	#
-            name	= "ACFinance"
-            x,y = load_horizontal("Data_OneStepAhead/ACFinance/train.txt")
-            train_x= x#x[:int(len(x)*0.8)]
-            train_y= y#y[:int(len(y)*0.8)]
-            Input = len(train_x[0][0])
-            Output = len(train_y[0])
-            test_x,test_y =load_horizontal("Data_OneStepAhead/ACFinance/test.txt")
-
-
-
-
-        train_x = np.array(train_x)
-        train_y = np.array(train_y)
-        test_x = np.array(test_x)
-        test_y = np.array(test_y)
-        ###############################
-        #THESE ARE THE HYPERPARAMETERS#
-        ###############################
-
-        Hidden = 5
-        #ip = 4 #input
-        #output = 1
-        topology = [Input, Hidden, Output]
-        NumSample = args.samples
-        #NumSample = 500
-
-
-        ###############################
-        #THESE ARE THE HYPERPARAMETERS#
-        ###############################
-        topology = [Input, Hidden, Output]
-
-        netw = topology
-
-        #print(traindata)
-
-        networks = ['RNN','GRU','LSTM']
-        net = networks[args.net-1]
-
-        #y_test =  testdata[:,netw[0]]
-        #y_train =  traindata[:,netw[0]]
-
-
-
-        maxtemp = args.mt_val
-
-        #swap_ratio =  0.04
-
-        swap_ratio = args.swap_ratio
-
-        num_chains =  args.num_chains
-
-        swap_interval = int(swap_ratio * NumSample/num_chains)    # int(swap_ratio * (NumSample/num_chains)) #how ofen you swap neighbours. note if swap is more than Num_samples, its off
-        burn_in = args.burn_in
-
-
-        learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
-
-        langevn = ""
-        if j%2 == 0:
-            use_langevin_gradients = True  # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
-            langevn = "T"
-        else:
-            use_langevin_gradients = False
-            langevn = "F"
-
-
-
-        problemfolder = os.getcwd()+'/Res_LG-Lprob_'+net+'/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
-
-        problemfolder_db = 'Res_LG-Lprob_'+net+'/'  # save main results
-
-
-
-
-        filename = ""
-        run_nb = 0
-        while os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
-            run_nb += 1
-        if not os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
-            os.makedirs(  problemfolder+name+langevn+'_%s' % (run_nb))
-            path = (problemfolder+ name+langevn+'_%s' % (run_nb))
-
-        filename = ""
-        run_nb = 0
-        while os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
-            run_nb += 1
-        if not os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
-            os.makedirs(  problemfolder_db+name+langevn+'_%s' % (run_nb))
-            path_db = (problemfolder_db+ name+langevn+'_%s' % (run_nb))
-
-
-
-        resultingfile = open( path+'/master_result_file.txt','a+')
-
-        resultingfile_db = open( path_db+'/master_result_file.txt','a+')
-
-        timer = time.time()
-
-        langevin_prob = 1/10
-
-
-
-        pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, swap_interval, langevin_prob, path,rnn_net = net)
-
-        directories = [  path+'/predictions/', path+'/posterior', path+'/results', path+'/surrogate', path+'/surrogate/learnsurrogate_data', path+'/posterior/pos_w',  path+'/posterior/pos_likelihood',path+'/posterior/surg_likelihood',path+'/posterior/accept_list'  ]
-
-        for d in directories:
-            pt.make_directory((filename)+ d)
-
-
-
-        pt.initialize_chains(  burn_in)
-
-
-        pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,    accept_vec, accept = pt.run_chains()
-
-        list_end = accept_vec.shape[1]
-        accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
-        accept_per = np.mean(accept_ratio) * 100
-
-        print(accept_per, ' accept_per')
-
-
-
-
-
-        timer2 = time.time()
-
-        timetotal = (timer2 - timer) /60
-        print ((timetotal), 'min taken')
-
-        #PLOTS
-
-        '''acc_tr = np.mean(acc_train [:])
-        acctr_std = np.std(acc_train[:])
-        acctr_max = np.amax(acc_train[:])
-
-        acc_tes = np.mean(acc_test[:])
-        acctest_std = np.std(acc_test[:])
-        acctes_max = np.amax(acc_test[:])'''
-
-
-
-        rmse_tr = np.mean(rmse_train[:])
-        rmsetr_std = np.std(rmse_train[:])
-        rmsetr_max = np.amin(rmse_train[:])
-
-        rmse_tes = np.mean(rmse_test[:])
-        rmsetest_std = np.std(rmse_test[:])
-        rmsetes_max = np.amin(rmse_test[:])
-
-        outres = open(path+'/result.txt', "a+")
-        outres_db = open(path_db+'/result.txt', "a+")
-
-        resultingfile = open(problemfolder+'/master_result_file.txt','a+')
-        resultingfile_db = open( problemfolder_db+'/master_result_file.txt','a+')
-
-        xv = name+langevn+'_'+ str(run_nb)
-
-        allres =  np.asarray([ problem, NumSample, maxtemp, swap_interval, langevin_prob, learn_rate,  rmse_tr, rmsetr_std, rmsetr_max, rmse_tes, rmsetest_std, rmsetes_max, swap_perc, accept_per, timetotal])
-
-        np.savetxt(outres_db,  allres   , fmt='%1.4f', newline=' '  )
-        np.savetxt(resultingfile_db,   allres   , fmt='%1.4f',  newline=' ' )
-        np.savetxt(resultingfile_db, [xv]   ,  fmt="%s", newline=' \n' )
-
-
-        np.savetxt(outres,  allres   , fmt='%1.4f', newline=' '  )
-        np.savetxt(resultingfile,   allres   , fmt='%1.4f',  newline=' ' )
-        np.savetxt(resultingfile, [xv]   ,  fmt="%s", newline=' \n' )
-
-        x = np.linspace(0, rmse_train.shape[0] , num=rmse_train.shape[0])
-
-
-
-        '''plt.plot(x, rmse_train, '.',   label='Test')
-        plt.plot(x, rmse_test,  '.', label='Train')
-        plt.legend(loc='upper right')
-
-        plt.xlabel('Samples', fontsize=12)
-        plt.ylabel('RMSE', fontsize=12)
-
-        plt.savefig(path+'/rmse_samples.png')
-        plt.clf()	'''
-
-        plt.plot(  rmse_train, '.',  label='Test')
-        plt.plot(  rmse_test,  '.',  label='Train')
-        plt.legend(loc='upper right')
-
-        plt.xlabel('Samples', fontsize=12)
-        plt.ylabel('RMSE', fontsize=12)
-
-        plt.savefig(path_db+'/rmse_samples.pdf')
-        plt.clf()
-
-        plt.plot( rmse_train, '.',   label='Test')
-        plt.plot( rmse_test, '.',   label='Train')
-        plt.legend(loc='upper right')
-
-        plt.xlabel('Samples', fontsize=12)
-        plt.ylabel('RMSE', fontsize=12)
-
-        plt.savefig(path+'/rmse_samples.pdf')
-        plt.clf()
-
-
-
-
-        likelihood = likelihood_rep[:,0] # just plot proposed likelihood
-        likelihood = np.asarray(np.split(likelihood, num_chains))
-
-
-
-
-    # Plots
-        plt.plot(likelihood.T)
-
-        plt.xlabel('Samples', fontsize=12)
-        plt.ylabel(' Log-Likelihood', fontsize=12)
-
-        plt.savefig(path+'/likelihood.png')
-        plt.clf()
-
-        plt.plot(likelihood.T)
-
-        plt.xlabel('Samples', fontsize=12)
-        plt.ylabel(' Log-Likelihood', fontsize=12)
-
-        plt.savefig(path_db+'/likelihood.png')
-        plt.clf()
-
-
-        plt.plot(accept_vec.T )
-        plt.xlabel('Samples', fontsize=12)
-        plt.ylabel(' Number accepted proposals', fontsize=12)
-
-        plt.savefig(path_db+'/accept.png')
-
-
-        plt.clf()
-
-
-        #mpl_fig = plt.figure()
-        #ax = mpl_fig.add_subplot(111)
-
-        # ax.boxplot(pos_w)
-
-        # ax.set_xlabel('[W1] [B1] [W2] [B2]')
-        # ax.set_ylabel('Posterior')
-
-        # plt.legend(loc='upper right')
-
-        # plt.title("Boxplot of Posterior W (weights and biases)")
-        # plt.savefig(path+'/w_pos.png')
-        # plt.savefig(path+'/w_pos.svg', format='svg', dpi=600)
-
-        # plt.clf()
-        #dir()
-        gc.collect()
-        outres.close()
-        resultingfile.close()
-        resultingfile_db.close()
-        outres_db.close()
-
+    networks = ['RNN','GRU','LSTM']
+    net = networks[args.net-1]
+
+    for net in networks:
+        for j in range(4, 5) :
+            print(j, ' out of 15','\n\n\n\n\n\n\n')
+            i = j//2
+            problem =	i
+            if problem ==	1:
+                #traindata = np.loadtxt("Data_OneStepAhead/Lazer/train.txt")
+                #testdata	= np.loadtxt("Data_OneStepAhead/Lazer/test.txt")	#
+                name	= "Lazer"
+                x,y = load_horizontal("Data_OneStepAhead/Lazer/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/Lazer/test.txt")
+    
+            if problem ==	2:
+                #traindata = np.loadtxt(  "Data_OneStepAhead/Sunspot/train.txt")
+                #testdata	= np.loadtxt( "Data_OneStepAhead/Sunspot/test.txt")	#
+                name	= "Sunspot"
+                x,y = load_horizontal("Data_OneStepAhead/Sunspot/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/Sunspot/test.txt")
+    
+    
+            if problem ==	3:
+                ##traindata = np.loadtxt("Data_OneStepAhead/Mackey/train.txt")
+                #testdata	= np.loadtxt("Data_OneStepAhead/Mackey/test.txt")  #
+                name	= "Mackey"
+                x,y = load_horizontal("Data_OneStepAhead/Mackey/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/Mackey/test.txt")
+    
+            if problem ==	4:
+                #traindata = np.loadtxt("Data_OneStepAhead/Lorenz/train.txt")
+                #testdata	= np.loadtxt("Data_OneStepAhead/Lorenz/test.txt")  #
+                name	= "Lorenz"
+                x,y = load_horizontal("Data_OneStepAhead/Lorenz/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/Lorenz/test.txt")
+    
+            if problem ==	5:
+                #traindata = np.loadtxt( "Data_OneStepAhead/Rossler/train.txt")
+                #testdata	= np.loadtxt( "Data_OneStepAhead/Rossler/test.txt")	#
+                name	= "Rossler"
+                x,y = load_horizontal("Data_OneStepAhead/Rossler/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/Rossler/test.txt")
+    
+            if problem ==	6:
+                #traindata = np.loadtxt("Data_OneStepAhead/Henon/train.txt")
+                #testdata	= np.loadtxt("Data_OneStepAhead/Henon/test.txt")	#
+                name	= "Henon"
+                x,y = load_horizontal("Data_OneStepAhead/Henon/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/Henon/test.txt")
+    
+            if problem ==	7:
+                #traindata = np.loadtxt("Data_OneStepAhead/ACFinance/train.txt")
+                #testdata	= np.loadtxt("Data_OneStepAhead/ACFinance/test.txt")	#
+                name	= "ACFinance"
+                x,y = load_horizontal("Data_OneStepAhead/ACFinance/train.txt")
+                train_x= x#x[:int(len(x)*0.8)]
+                train_y= y#y[:int(len(y)*0.8)]
+                Input = len(train_x[0][0])
+                Output = len(train_y[0])
+                test_x,test_y =load_horizontal("Data_OneStepAhead/ACFinance/test.txt")
+    
+    
+    
+    
+            train_x = np.array(train_x)
+            train_y = np.array(train_y)
+            test_x = np.array(test_x)
+            test_y = np.array(test_y)
+            ###############################
+            #THESE ARE THE HYPERPARAMETERS#
+            ###############################
+    
+            Hidden = 5
+            #ip = 4 #input
+            #output = 1
+            topology = [Input, Hidden, Output]
+            NumSample = args.samples
+            #NumSample = 500
+    
+    
+            ###############################
+            #THESE ARE THE HYPERPARAMETERS#
+            ###############################
+            topology = [Input, Hidden, Output]
+    
+            netw = topology
+    
+            #print(traindata)
+    
+    
+            #y_test =  testdata[:,netw[0]]
+            #y_train =  traindata[:,netw[0]]
+    
+    
+    
+            maxtemp = args.mt_val
+    
+            #swap_ratio =  0.04
+    
+            swap_ratio = args.swap_ratio
+    
+            num_chains =  args.num_chains
+    
+            swap_interval = int(swap_ratio * NumSample/num_chains)    # int(swap_ratio * (NumSample/num_chains)) #how ofen you swap neighbours. note if swap is more than Num_samples, its off
+            burn_in = args.burn_in
+    
+    
+            learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
+    
+            langevn = ""
+            if j%2 == 0:
+                use_langevin_gradients = True  # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
+                langevn = "T"
+            else:
+                use_langevin_gradients = False
+                langevn = "F"
+                pass # we dont want to execute this.
+    
+    
+    
+            problemfolder = os.getcwd()+'/Res_LG-Lprob_'+net+'/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
+    
+            problemfolder_db = 'Res_LG-Lprob_'+net+'/'  # save main results
+    
+    
+    
+    
+            filename = ""
+            run_nb = 0
+            while os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
+                run_nb += 1
+            if not os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
+                os.makedirs(  problemfolder+name+langevn+'_%s' % (run_nb))
+                path = (problemfolder+ name+langevn+'_%s' % (run_nb))
+    
+            filename = ""
+            run_nb = 0
+            while os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
+                run_nb += 1
+            if not os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
+                os.makedirs(  problemfolder_db+name+langevn+'_%s' % (run_nb))
+                path_db = (problemfolder_db+ name+langevn+'_%s' % (run_nb))
+    
+    
+    
+            resultingfile = open( path+'/master_result_file.txt','a+')
+    
+            resultingfile_db = open( path_db+'/master_result_file.txt','a+')
+    
+            timer = time.time()
+    
+            langevin_prob = 1/10
+    
+    
+    
+            pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, swap_interval, langevin_prob, path,rnn_net = net)
+    
+            directories = [  path+'/predictions/', path+'/posterior', path+'/results', path+'/surrogate', path+'/surrogate/learnsurrogate_data', path+'/posterior/pos_w',  path+'/posterior/pos_likelihood',path+'/posterior/surg_likelihood',path+'/posterior/accept_list'  ]
+    
+            for d in directories:
+                pt.make_directory((filename)+ d)
+    
+    
+    
+            pt.initialize_chains(  burn_in)
+    
+    
+            pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,    accept_vec, accept = pt.run_chains()
+    
+            list_end = accept_vec.shape[1]
+            accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
+            accept_per = np.mean(accept_ratio) * 100
+    
+            print(accept_per, ' accept_per')
+    
+    
+    
+    
+    
+            timer2 = time.time()
+    
+            timetotal = (timer2 - timer) /60
+            print ((timetotal), 'min taken')
+    
+            #PLOTS
+    
+            '''acc_tr = np.mean(acc_train [:])
+            acctr_std = np.std(acc_train[:])
+            acctr_max = np.amax(acc_train[:])
+    
+            acc_tes = np.mean(acc_test[:])
+            acctest_std = np.std(acc_test[:])
+            acctes_max = np.amax(acc_test[:])'''
+    
+    
+    
+            rmse_tr = np.mean(rmse_train[:])
+            rmsetr_std = np.std(rmse_train[:])
+            rmsetr_max = np.amin(rmse_train[:])
+    
+            rmse_tes = np.mean(rmse_test[:])
+            rmsetest_std = np.std(rmse_test[:])
+            rmsetes_max = np.amin(rmse_test[:])
+    
+            outres = open(path+'/result.txt', "a+")
+            outres_db = open(path_db+'/result.txt', "a+")
+    
+            resultingfile = open(problemfolder+'/master_result_file.txt','a+')
+            resultingfile_db = open( problemfolder_db+'/master_result_file.txt','a+')
+    
+            xv = name+langevn+'_'+ str(run_nb)
+    
+            allres =  np.asarray([ problem, NumSample, maxtemp, swap_interval, langevin_prob, learn_rate,  rmse_tr, rmsetr_std, rmsetr_max, rmse_tes, rmsetest_std, rmsetes_max, swap_perc, accept_per, timetotal])
+    
+            np.savetxt(outres_db,  allres   , fmt='%1.4f', newline=' '  )
+            np.savetxt(resultingfile_db,   allres   , fmt='%1.4f',  newline=' ' )
+            np.savetxt(resultingfile_db, [xv]   ,  fmt="%s", newline=' \n' )
+    
+    
+            np.savetxt(outres,  allres   , fmt='%1.4f', newline=' '  )
+            np.savetxt(resultingfile,   allres   , fmt='%1.4f',  newline=' ' )
+            np.savetxt(resultingfile, [xv]   ,  fmt="%s", newline=' \n' )
+    
+            x = np.linspace(0, rmse_train.shape[0] , num=rmse_train.shape[0])
+    
+    
+    
+            '''plt.plot(x, rmse_train, '.',   label='Test')
+            plt.plot(x, rmse_test,  '.', label='Train')
+            plt.legend(loc='upper right')
+    
+            plt.xlabel('Samples', fontsize=12)
+            plt.ylabel('RMSE', fontsize=12)
+    
+            plt.savefig(path+'/rmse_samples.png')
+            plt.clf()	'''
+    
+            plt.plot(  rmse_train, '.',  label='Test')
+            plt.plot(  rmse_test,  '.',  label='Train')
+            plt.legend(loc='upper right')
+    
+            plt.xlabel('Samples', fontsize=12)
+            plt.ylabel('RMSE', fontsize=12)
+    
+            plt.savefig(path_db+'/rmse_samples.pdf')
+            plt.clf()
+    
+            plt.plot( rmse_train, '.',   label='Test')
+            plt.plot( rmse_test, '.',   label='Train')
+            plt.legend(loc='upper right')
+    
+            plt.xlabel('Samples', fontsize=12)
+            plt.ylabel('RMSE', fontsize=12)
+    
+            plt.savefig(path+'/rmse_samples.pdf')
+            plt.clf()
+    
+    
+    
+    
+            likelihood = likelihood_rep[:,0] # just plot proposed likelihood
+            likelihood = np.asarray(np.split(likelihood, num_chains))
+    
+    
+    
+    
+        # Plots
+            plt.plot(likelihood.T)
+    
+            plt.xlabel('Samples', fontsize=12)
+            plt.ylabel(' Log-Likelihood', fontsize=12)
+    
+            plt.savefig(path+'/likelihood.png')
+            plt.clf()
+    
+            plt.plot(likelihood.T)
+    
+            plt.xlabel('Samples', fontsize=12)
+            plt.ylabel(' Log-Likelihood', fontsize=12)
+    
+            plt.savefig(path_db+'/likelihood.png')
+            plt.clf()
+    
+    
+            plt.plot(accept_vec.T )
+            plt.xlabel('Samples', fontsize=12)
+            plt.ylabel(' Number accepted proposals', fontsize=12)
+    
+            plt.savefig(path_db+'/accept.png')
+    
+    
+            plt.clf()
+    
+    
+            #mpl_fig = plt.figure()
+            #ax = mpl_fig.add_subplot(111)
+    
+            # ax.boxplot(pos_w)
+    
+            # ax.set_xlabel('[W1] [B1] [W2] [B2]')
+            # ax.set_ylabel('Posterior')
+    
+            # plt.legend(loc='upper right')
+    
+            # plt.title("Boxplot of Posterior W (weights and biases)")
+            # plt.savefig(path+'/w_pos.png')
+            # plt.savefig(path+'/w_pos.svg', format='svg', dpi=600)
+    
+            # plt.clf()
+            #dir()
+            gc.collect()
+            outres.close()
+            resultingfile.close()
+            resultingfile_db.close()
+            outres_db.close()
+    
 
 if __name__ == "__main__": main()
 
