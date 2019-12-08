@@ -25,9 +25,9 @@ import multiprocessing
 import gc
 import matplotlib as mpl
 mpl.use('agg')
-
+import threading
 mplt = mcmcplt.Mcmcplot()
-
+sem = threading.Semaphore()
 weightdecay = 0.01
 
 
@@ -302,6 +302,8 @@ class ptReplica(multiprocessing.Process):
         langevin_count = 0
         pt_samples = samples * 0.6 # this means that PT in canonical form with adaptive temp will work till pt  samples are reached
         init_count = 0
+        print(samples,'is sam,ples')
+        self.event.clear()
         for i in range(samples-1):  # Begin sampling --------------------------------------------------------------------------
             timer1 = time.time()
             if i < pt_samples:
@@ -374,24 +376,30 @@ class ptReplica(multiprocessing.Process):
             if i%20 == 0:
                 print(i,rmsetrain,rmsetest, 'ith sample')
 
-            if (i % self.swap_interval == 0 and i != 0 ):
+            if ((i+1) % self.swap_interval == 0 and i != 0 ):
                 param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
+                print(' here i am')
                 self.signal_main.set()
+                print('here i wait')
                 self.event.wait()
-                if not self.parameter_queue.empty() :
-                    result =  self.parameter_queue.get()
-                    w = rnn.dictfromlist(result[0:w_size])
-                    eta = result[w_size]
+                
+#                if not self.parameter_queue.empty() :
+#                    result =  self.parameter_queue.get()
+#                    w = rnn.dictfromlist(result[0:w_size])
+#                    eta = result[w_size]
                     #likelihood = result[self.w_size+1]#/self.temperature
                     #print('Temperature: {} Swapped weights: {}'.format(self.temperature, rnn.getparameters(w)[:2]))
-                self.event.clear()
+                # self.event.set()
+                print(i, ' is i and',samples,' is num samples',self.swap_interval,' is swap interval')
         param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood]),np.asarray([self.adapttemp]),np.asarray([i])])
         self.parameter_queue.put(param)
+        self.signal_main.set()
         print ((num_accepted*100 / (samples * 1.0)), '% was accepted')
         accept_ratio = num_accepted / (samples * 1.0) * 100
         print ((langevin_count*100 / (samples * 1.0)), '% was Lsnngrevin ')
         langevin_ratio = langevin_count / (samples * 1.0) * 100
+        sem.acquire()
         file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperature)+ '.txt'
         np.savetxt(file_name,pos_w )
         file_name = self.path+'/predictions/rmse_test_chain_'+ str(self.temperature)+ '.txt'
@@ -408,7 +416,7 @@ class ptReplica(multiprocessing.Process):
         np.savetxt(file_name, [accept_ratio], fmt='%1.4f')
         file_name = self.path + '/posterior/accept_list/chain_' + str(self.temperature) + '.txt'
         np.savetxt(file_name, accept_list, fmt='%1.4f')
-        self.signal_main.set()
+        sem.release()
 
 class ParallelTempering:
 
@@ -575,7 +583,7 @@ class ParallelTempering:
         self.maxlim_param = np.repeat([100] , self.num_param)
         for i in range(0, self.num_chains):
             w = np.random.randn(self.num_param)
-            self.chains.append(ptReplica(self.use_langevin_gradients, self.learn_rate, w,  self.minlim_param, self.maxlim_param, self.NumSamples,self.train_x,self.train_y,self.test_x,self.test_y,self.topology,self.burn_in,self.temperatures[i],self.swap_interval, self.langevin_prob, self.path,self.parameter_queue[i],self.wait_chain[i],self.event[i],self.rnn_net))
+            self.chains.append(ptReplica(self.use_langevin_gradients, self.learn_rate, w,  self.minlim_param, self.maxlim_param, self.NumSamples, self.train_x,self.train_y,self.test_x,self.test_y,self.topology,self.burn_in,self.temperatures[i],self.swap_interval, self.langevin_prob, self.path,self.parameter_queue[i],self.wait_chain[i],self.event[i],self.rnn_net))
 
     def surr_procedure(self,queue):
 
@@ -612,6 +620,7 @@ class ParallelTempering:
             param2 = param_temp
         else:
             swapped = False
+            self.total_swap_proposals+=1
         return param1, param2, swapped
 
 
@@ -637,14 +646,17 @@ class ParallelTempering:
         #SWAP PROCEDURE
         swaps_appected_main =0
         total_swaps_main =0
-        for i in range(int(self.NumSamples/self.swap_interval)):
+        for i in range(int(self.NumSamples/self.swap_interval)-1):
+        
             count = 0
             for index in range(self.num_chains):
                 if not self.chains[index].is_alive():
                     count+=1
+                    self.wait_chain[index].set()
                     print(str(self.chains[index].temperature) +" Dead"+str(index))
-
-            if count == self.num_chains:
+            print(count)
+            #if count == self.num_chains:
+            if count > 0:
                 break
             print("Waiting")
             print(datetime.datetime.now())
@@ -662,16 +674,21 @@ class ParallelTempering:
             print("Event occured")
             for index in range(0,self.num_chains-1):
                 print('starting swap')
+                print(index, ' is index')
+                print(int(self.NumSamples/self.swap_interval))
+                print(self.total_swap_proposals, ' is total swap proposals')
                 param_1, param_2, swapped = self.swap_procedure(self.parameter_queue[index],self.parameter_queue[index+1])
                 self.parameter_queue[index].put(param_1)
                 self.parameter_queue[index+1].put(param_2)
+                print('did this')
                 if index == 0:
                     if swapped:
                         swaps_appected_main += 1
                     total_swaps_main += 1
             for index in range (self.num_chains):
-                    self.event[index].set()
-                    self.wait_chain[index].clear()
+                self.wait_chain[index].clear()
+                self.event[index].set()
+
 
         print("Joining processes")
 
@@ -681,9 +698,12 @@ class ParallelTempering:
         self.chain_queue.join()
         pos_w, fx_train, fx_test,   rmse_train, rmse_test, acc_train, acc_test,  likelihood_vec ,   accept_vec, accept  = self.show_results()
         print("NUMBER OF SWAPS =", self.num_swap)
-        swap_perc = self.num_swap*100/self.total_swap_proposals
+        print('total swap proposal',self.total_swap_proposals)
+        print('num samples', self.NumSamples)
+        print('swap interval',self.swap_interval)
+        swap_perc = self.num_swap*100 /self.total_swap_proposals
         return pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_vec , swap_perc,    accept_vec, accept
-
+        # pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,accept_vec, accept = pt.run_chains()
 
 
     def show_results(self):
@@ -894,6 +914,7 @@ def main():
 
     networks = ['RNN','GRU','LSTM']
     net = networks[args.net-1]
+    networks = ['RNN']
 
     for net in networks:
         for j in range(4, 5) :
@@ -1087,6 +1108,8 @@ def main():
             pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,    accept_vec, accept = pt.run_chains()
     
             list_end = accept_vec.shape[1]
+            print(accept_vec.shape)
+            print(accept_vec)
             accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
             accept_per = np.mean(accept_ratio) * 100
     
