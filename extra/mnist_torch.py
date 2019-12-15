@@ -33,7 +33,7 @@ input_size = 28
 hidden_size = 128
 num_layers = 2
 num_classes = 10
-batch_size = 100
+batch_size = 50
 num_epochs = 2
 learning_rate = 0.01
 
@@ -91,24 +91,25 @@ for i,data in enumerate(data_loader_train,0):
     print(inputs.shape,labels.shape)
     break
 '''
-batch_Size = 500
+
+batch_Size = batch_size
 
 def data_load(data='train'):
-    #trainsize = 200
-    #testsize = 40
+    # trainsize = 200
+    # testsize = 40
 
     if data == 'test':        
         samples = torchvision.datasets.MNIST(root = './mnist',train=False,download=True,transform=transforms.ToTensor())
-        #size = 200
-        #a,_ = torch.utils.data.random_split(samples, [size,len(samples)-size])
+        size = 1000
+        a,_ = torch.utils.data.random_split(samples, [size,len(samples)-size])
 
     else:
         samples = torchvision.datasets.MNIST(root = './mnist',train=True,download=True,transform = transforms.ToTensor())
-        #size = 1000
-        #a,_ = torch.utils.data.random_split(samples,[size,len(samples)-size])
+        size = 8000
+        a,_ = torch.utils.data.random_split(samples,[size,len(samples)-size])
 
-    data_loader = torch.utils.data.DataLoader(samples,
-                                              batch_size=batch_Size,
+    data_loader = torch.utils.data.DataLoader(a,
+                                              batch_size=batch_size,
                                               shuffle=True )
     return data_loader
 
@@ -144,7 +145,7 @@ weightdecay = 0.01
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 
 
-parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 2, dest="net",type=int)
+parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 3, dest="net",type=int)
 parser.add_argument('-s','--samples', help='Number of samples', default=50000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=4,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=10,dest="mt_val",type=int)
@@ -166,16 +167,16 @@ class Model(nn.Module):
     def __init__(self, topo,lrate,batch_size,rnn_net = 'RNN'):
         super(Model, self).__init__()
         self.hidden_dim = topo[1] #hidden_dim
-        self.n_layers = 2 #len(topo)-2 #n_layers
-        self.batch_size = batch_Size
+        self.n_layers = num_layers #len(topo)-2 #n_layers
+        self.batch_size = batch_size
         if rnn_net == 'GRU':
-            self.hidden = torch.ones((self.n_layers,self.batch_size,self.hidden_dim))
+            self.hidden = torch.zeros((self.n_layers,self.batch_size,self.hidden_dim))
             self.rnn = nn.GRU(input_size = topo[0], hidden_size = topo[1],num_layers = self.n_layers)
         elif rnn_net == 'LSTM':
-            self.hidden = (torch.zeros((self.n_layers,self.batch_size,self.hidden_dim)), torch.zeros((self.n_layers,self.batch_size,self.hidden_dim)))
-            self.rnn = nn.LSTM(input_size = topo[0], hidden_size = topo[1],num_layers = self.n_layers)
+            self.hidden = (torch.zeros(self.n_layers,self.batch_size,self.hidden_dim).to(device), torch.zeros(self.n_layers,self.batch_size,self.hidden_dim).to(device))
+            self.rnn = nn.LSTM(input_size = topo[0], hidden_size = topo[1],num_layers = self.n_layers, batch_first=True)
         else:
-            self.hidden = torch.ones(self.n_layers, self.batch_size, self.hidden_dim)
+            self.hidden = torch.zeros(self.n_layers, self.batch_size, self.hidden_dim)
             self.rnn = nn.RNN(input_size = topo[0], hidden_size = topo[1])
             # Fully connected layer
         self.fc = nn.Linear(topo[1],topo[2])
@@ -186,7 +187,7 @@ class Model(nn.Module):
         self.relu = nn.ReLU()
         self.los =0
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.Adam(self.parameters(),lr = 0.1)
+        self.optimizer = torch.optim.Adam(self.parameters(),lr = learning_rate)
 
 #    def sigmoid(self, z):
 #        return 1/(1+torch.exp(-z))
@@ -194,10 +195,17 @@ class Model(nn.Module):
 
     ''' 28 is the sequence length'''
     def forward(self, inputs):
-        hidden = copy.deepcopy(self.hidden)
-        inputs = copy.deepcopy(inputs).view(self.topo[0],self.batch_size,self.topo[0])
+        hidden = (torch.zeros(self.hidden[0].shape),torch.zeros(self.hidden[1].shape))
+        inputs = copy.deepcopy(inputs).reshape(-1,sequence_length,input_size)
+        
+        # print(self.hidden)
         out, h1 = self.rnn(inputs, hidden)
-        out1 = self.fc(out[-1])
+        # print(out.shape)
+        # print(out)
+        # f()
+        out1 = self.fc(out[:,-1,:])
+        # print(out1.shape)
+        # f()
         return out1
 
     #fx, prob = rnn.evaluate_proposal(data,w)
@@ -210,8 +218,15 @@ class Model(nn.Module):
         for i,sample in enumerate(data,0):
             inputs,labels = sample
             a = copy.deepcopy(self.forward(inputs).detach())
-            y_pred[i] = torch.argmax(copy.deepcopy(a),dim=1)
-            prob[i] = self.softmax(copy.deepcopy(a))
+            _,predicted = torch.max(a.data,1)
+            # y_pred[i] = torch.argmax(copy.deepcopy(a),dim=1)
+            y_pred[i] = predicted
+            # print(a)
+            # print(a.shape)
+            # f()
+            prob[i] = self.softmax(a)
+            # print(predicted.shape)
+            # print(labels.shape)
             loss = self.criterion(a,labels)
             self.los += loss
         return y_pred,prob 
@@ -219,20 +234,21 @@ class Model(nn.Module):
     def langevin_gradient(self,x,w=None):
         if w is not None:
             self.loadparameters(w)
-
         # only one epoch
         self.los =0
         # print(self.state_dict()['fc.weight'][0])
         for i,sample in enumerate(x,0):
             inputs,labels = sample
             outputs = self.forward(inputs)
+            _,predicted = torch.max(outputs.data,1)
             loss = self.criterion(outputs,labels)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            self.los += loss.item()
+            if(i%50==0):
+                print(loss.item(),' is loss',i)
+            self.los += copy.deepcopy(loss.item())
         #print(lo,' is loss')
-
         return copy.deepcopy(self.state_dict())
 
 
@@ -309,7 +325,8 @@ class ptReplica(multiprocessing.Process):
 
 
     def rmse(self, pred, actual): 
-        return torch.sqrt(torch.mean((pred-actual)**2))
+        return self.rnn.los.item()
+        # return torch.sqrt(torch.mean((pred-actual)**2))
                 
     ''' check accuracy ashray'''
     ''' what does fxtrain_samples is used for '''
@@ -398,7 +415,7 @@ class ptReplica(multiprocessing.Process):
         #w_proposal = np.random.randn(w_size)
         #w_proposal = rnn.dictfromlist(w_proposal)
         #Randomwalk Steps
-        step_w = 0.00001
+        step_w = 0.01
         #Declare FNN
         
         train = self.traindata #data_load(data='train')
@@ -433,11 +450,11 @@ class ptReplica(multiprocessing.Process):
         y_test = torch.zeros((len(test),self.batch_size))
         for i,dat in enumerate(test,0):
             inputs,labels = dat
-            y_test[i] = labels
+            y_test[i] = copy.deepcopy(labels)
         y_train = torch.zeros((len(train),self.batch_size))
         for i,dat in enumerate(train,0):
             inputs,labels = dat
-            y_train[i] = labels
+            y_train[i] = copy.deepcopy(labels)
  
 
         trainacc = 0
@@ -463,8 +480,8 @@ class ptReplica(multiprocessing.Process):
         
         
         #print('i and samples')
-        for i in range(1,samples):  # Begin sampling --------------------------------------------------------------------------
-            ratio = ((samples -i) /(samples*1.0)) 
+        for i in range(samples):  # Begin sampling --------------------------------------------------------------------------
+            ratio = ((samples-i) /(samples*1.0)) 
             if i < pt_samples:
                 self.adapttemp =  self.temperature #* ratio  #  T1=T/log(k+1);
             if i == pt_samples and init_count ==0: # move to MCMC canonical
@@ -476,22 +493,22 @@ class ptReplica(multiprocessing.Process):
 
             timer1 = time.time() 
             lx = np.random.uniform(0,1,1)
-            
+            old_w = rnn.state_dict()
             if (self.use_langevin_gradients is True) and (lx< self.l_prob):
-                #print('using langevin')
+                print('using langevin')
                 w_gd = rnn.langevin_gradient(train) # Eq 8
                 w_proposal = rnn.addnoiseandcopy(0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
                 w_prop_gd = rnn.langevin_gradient(train) 
                 #first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat)) 
                 #second = np.log(multivariate_normal.pdf(w_proposal , w_gd , sigma_diagmat)) # this gives numerical instability - hence we give a simple implementation next that takes out log 
-                #wc_delta = (rnn.getparameters(w)- rnn.getparameters(w_prop_gd))
-                #wp_delta = (rnn.getparameters(w_proposal) - rnn.getparameters(w_gd ))
-                #sigma_sq = step_w
-                #first = -0.5 * np.sum(wc_delta  *  wc_delta  ) / sigma_sq  # this is wc_delta.T  *  wc_delta /sigma_sq
-                #second = -0.5 * np.sum(wp_delta * wp_delta ) / sigma_sq   
-                #diff_prop =  first - second
-                #diff_prop =  diff_prop/self.adapttemp
-                #langevin_count = langevin_count + 1
+                wc_delta = (rnn.getparameters(w)- rnn.getparameters(w_prop_gd))
+                wp_delta = (rnn.getparameters(w_proposal) - rnn.getparameters(w_gd ))
+                sigma_sq = step_w
+                first = -0.5 * np.sum(wc_delta  *  wc_delta  ) / sigma_sq  # this is wc_delta.T  *  wc_delta /sigma_sq
+                second = -0.5 * np.sum(wp_delta * wp_delta ) / sigma_sq   
+                diff_prop =  first - second
+                diff_prop =  diff_prop/self.adapttemp
+                langevin_count = langevin_count + 1
             else:
                 diff_prop = 0
                 w_proposal = rnn.addnoiseandcopy(0,step_w)  #np.random.normal(w, step_w, w_size)
@@ -503,7 +520,6 @@ class ptReplica(multiprocessing.Process):
                 elif w_proposal[j] < self.minlim_param[j]:
                     w_proposal[j] = w[j]'''
 
- 
             [likelihood_proposal, pred_train, rmsetrain] = self.likelihood_func(rnn, train)
 
             [likelihood_ignore, pred_test, rmsetest] = self.likelihood_func(rnn, test)
@@ -518,14 +534,14 @@ class ptReplica(multiprocessing.Process):
             # changing this ashray math.exp(diff_likelihood+diff_prior+ diff_prop)
             
             try:
-                mh_prob = min(1, math.exp(diff_likelihood))
+                mh_prob = min(1, math.exp(diff_likelihood+diff_prior+diff_prop))
             except OverflowError as e:
                 mh_prob = 1
             #print(likelihood_proposal,likelihood, mh_prob)
 
             #accept_list[i] = num_accepted
             #accept_list[i+1] = self.adapttemp
-            if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
+            if (i % batch_save) == 0: # just for saving posterior to file - work on this later
                 x = 0
             u = random.uniform(0, 1)
             #prop_list[i,] = rnn.getparameters(w_proposal)
@@ -547,6 +563,8 @@ class ptReplica(multiprocessing.Process):
                 #rmse_test[i] = rmsetest 
                 #x = x + 1
             else:
+                w = old_w
+                rnn.loadparameters(w)
                 acc_train = self.accuracy(train)  
                 acc_test = self.accuracy(test)
                 print (i,rmsetrain, rmsetest,acc_train,acc_test,'rejected')
@@ -561,7 +579,7 @@ class ptReplica(multiprocessing.Process):
                 #x = x + 1
             #SWAPPING PREP
             #print(i, self.swap_interval)
-            if ( i%self.swap_interval == 0 and i != 0):
+            if ( (i+1)%self.swap_interval == 0):
                 param = np.concatenate([np.asarray([rnn.getparameters(w)]).reshape(-1), np.asarray([eta]).reshape(-1), np.asarray([likelihood]),np.asarray([self.temperature]),np.asarray([i])])
                 self.parameter_queue.put(param)
                 self.signal_main.set()
@@ -818,6 +836,7 @@ class ParallelTempering:
             param2 = param_temp
         else:
             swapped = False
+            self.total_swap_proposals += 1
         return param1, param2, swapped
 
  
@@ -995,13 +1014,13 @@ class ParallelTempering:
 
 def main():
         outres = open('resultspriors.txt', 'w')
-        learnRate = 0.1
-        Input = 28
-        Output = 10
-        Hidden = 128
-        topology = [Input, Hidden, Output]
-        problem = 1
-        separate_flag = False
+        # learnRate = 0.1
+        # Input = 28
+        # Output = 10
+        # Hidden = 128
+        topology = [input_size, hidden_size,num_classes]
+        # problem = 1
+        # separate_flag = False
         numSamples = args.samples
         batch_size = batch_Size
         networks = ['RNN','GRU','LSTM']
@@ -1012,8 +1031,8 @@ def main():
             swap_ratio = args.swap_ratio #float(sys.argv[1])
             swap_interval = int(swap_ratio * numSamples/num_chains)    # int(swap_ratio * (NumSample/num_chains)) #how ofen you swap neighbours. note if swap is more than Num_samples, its off
             burn_in = args.burn_in	 
-            learn_rate = 0.01  # in case langevin gradients are used. Can select other values, we found small value is ok.     
-            use_langevin_gradients =True # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
+            # learn_rate = 0.01  # in case langevin gradients are used. Can select other values, we found small value is ok.     
+            use_langevin_gradients =False # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
             problemfolder = 'mnist_torch/'+net1+'/PT_EvalSwapRW/'  # change this to your directory for results output - produces large datasets    
             problemfolder_db = 'mnist_torch/'+net1+'/PT_EvalSwapRW/'  # save main results
             name = ""
@@ -1032,7 +1051,7 @@ def main():
                 os.makedirs(  problemfolder_db+name+'_%s' % (run_nb))
                 path_db = (problemfolder_db+ name+'_%s' % (run_nb))    
             timer = time.time()                
-            pt = ParallelTempering( use_langevin_gradients,  learn_rate, topology, num_chains, maxtemp, numSamples, swap_interval, path,batch_size,rnn_net=net)
+            pt = ParallelTempering( use_langevin_gradients,  learning_rate, topology, num_chains, maxtemp, numSamples, swap_interval, path,batch_size,rnn_net=net)
             directories = [  path+'/predictions/', path+'/posterior', path+'/results', path+'/surrogate', path+'/surrogate/learnsurrogate_data', path+'/posterior/pos_w',  path+'/posterior/pos_likelihood',path+'/posterior/surg_likelihood',path+'/posterior/accept_list'  ]
             for d in directories:
                 pt.make_directory((filename)+ d)    

@@ -91,6 +91,8 @@ for epoch in range(num_epochs):
         
         # Forward pass
         outputs = model(images)
+        print(outputs.shape)
+        print(labels.shape)
         loss = criterion(outputs, labels)
         # Backward and optimize
         optimizer.zero_grad()
