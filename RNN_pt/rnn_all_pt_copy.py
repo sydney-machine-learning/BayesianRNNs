@@ -36,10 +36,10 @@ parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 
 
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=500, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
-parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.02,type=float)
+parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default=0.25,type=float)
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.05,type=float)
@@ -362,9 +362,9 @@ class ptReplica(multiprocessing.Process):
             if ((i+1) % self.swap_interval == 0 and i != 0 ):
                 param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
-                print(i+1,' here i am')
+                #print(i+1,' here i am')
                 self.signal_main.set()
-                print('here i wait')
+                #print('here i wait')
                 self.event.clear()
                 print(i+1, ' is i and',samples,' is num samples',self.swap_interval,' is swap interval')
                 self.event.wait()
@@ -402,6 +402,7 @@ class ptReplica(multiprocessing.Process):
         file_name = self.path + '/posterior/accept_list/chain_' + str(self.temperature) + '.txt'
         np.savetxt(file_name, accept_list, fmt='%1.4f')
         sem.release()
+        print('exiting this thread')
 
 class ParallelTempering:
 
@@ -593,7 +594,7 @@ class ParallelTempering:
         #SWAPPING PROBABILITIES
         try:
             swap_proposal =  min(1,0.5*np.exp(lhood2 - lhood1))
-        except OverflowError:
+        except:
             swap_proposal = 1
         u = np.random.uniform(0,1)
         if u < swap_proposal:
@@ -638,7 +639,8 @@ class ParallelTempering:
         #SWAP PROCEDURE
         swaps_appected_main =0
         total_swaps_main =0
-        for i in range(int(self.NumSamples/self.swap_interval)-1):
+        for i in range(int(self.NumSamples/self.swap_interval)):
+        #while(True):
             count = 0
             for index in range(self.num_chains):
                 if not self.chains[index].is_alive():
@@ -646,14 +648,15 @@ class ParallelTempering:
                     self.wait_chain[index].set()
                     print(str(self.chains[index].temperature) +" Dead"+str(index))
             if count == self.num_chains:
-            #if count == 0:
                 break
+            #if count == 0:
+            #break
             print(count,' is count')
             print(datetime.datetime.now())
             timeout_count = 0
             for index in range(0,self.num_chains):
                 print("Waiting for chain: {}".format(index+1))
-                flag = self.wait_chain[index].wait(timeout=10)
+                flag = self.wait_chain[index].wait()
                 if flag:
                     print("Signal from chain: {}".format(index+1))
                     timeout_count += 1
@@ -680,7 +683,9 @@ class ParallelTempering:
 
         #JOIN THEM TO MAIN PROCESS
         for index in range(0,self.num_chains):
+            print(index, ' waiting to join')
             self.chains[index].join()
+        print('now waiting for chain queue')
         self.chain_queue.join()
         pos_w, fx_train, fx_test,   rmse_train, rmse_test, acc_train, acc_test,  likelihood_vec ,   accept_vec, accept  = self.show_results()
         print("NUMBER OF SWAPS =", self.num_swap)
@@ -1094,8 +1099,8 @@ def main():
             pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,    accept_vec, accept = pt.run_chains()
     
             list_end = accept_vec.shape[1]
-            print(accept_vec.shape)
-            print(accept_vec)
+            #print(accept_vec.shape)
+            #print(accept_vec)
             accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
             accept_per = np.mean(accept_ratio) * 100
     
