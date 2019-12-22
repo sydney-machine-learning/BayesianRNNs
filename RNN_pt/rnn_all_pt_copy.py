@@ -36,7 +36,7 @@ parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 
 
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=500, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
@@ -360,6 +360,9 @@ class ptReplica(multiprocessing.Process):
                 acc_test[i+1,] = acc_test[i,]
 
             if ((i+1) % self.swap_interval == 0 and i != 0 ):
+                print(w_size, ' is w size')
+                w_size = rnn.getparameters(w).reshape(-1).shape[0]
+                print(w_size, 'is w size',len(rnn.getparameters(w)))
                 param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
                 #print(i+1,' here i am')
@@ -368,6 +371,14 @@ class ptReplica(multiprocessing.Process):
                 self.event.clear()
                 print(i+1, ' is i and',samples,' is num samples',self.swap_interval,' is swap interval')
                 self.event.wait()
+                print('hbfhb')
+                param1 = self.parameter_queue.get()
+                w1 = param1[0:w_size]
+                eta = param1[w_size]
+                w1_dict = rnn.dictfromlist(w1)
+                rnn.loadparameters(w1_dict)
+
+                # lhood1 = param1[self.num_param+1]
 
                 
 #                if not self.parameter_queue.empty() :
@@ -664,6 +675,7 @@ class ParallelTempering:
             if timeout_count != self.num_chains:
                 print("Skipping the swap!")
                 continue
+            
             print("Event occured")
             for index in range(0,self.num_chains-1):
                 param_1, param_2, swapped = self.swap_procedure(self.parameter_queue[index],self.parameter_queue[index+1])

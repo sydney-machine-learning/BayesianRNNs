@@ -100,12 +100,12 @@ def data_load(data='train'):
 
     if data == 'test':        
         samples = torchvision.datasets.MNIST(root = './mnist',train=False,download=True,transform=transforms.ToTensor())
-        size = 1000
+        size = 400
         a,_ = torch.utils.data.random_split(samples, [size,len(samples)-size])
 
     else:
         samples = torchvision.datasets.MNIST(root = './mnist',train=True,download=True,transform = transforms.ToTensor())
-        size = 8000
+        size = 2000
         a,_ = torch.utils.data.random_split(samples,[size,len(samples)-size])
 
     data_loader = torch.utils.data.DataLoader(a,
