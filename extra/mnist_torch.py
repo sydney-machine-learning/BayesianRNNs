@@ -100,12 +100,12 @@ def data_load(data='train'):
 
     if data == 'test':        
         samples = torchvision.datasets.MNIST(root = './mnist',train=False,download=True,transform=transforms.ToTensor())
-        size = 400
+        size = 200
         a,_ = torch.utils.data.random_split(samples, [size,len(samples)-size])
 
     else:
         samples = torchvision.datasets.MNIST(root = './mnist',train=True,download=True,transform = transforms.ToTensor())
-        size = 2000
+        size = 800
         a,_ = torch.utils.data.random_split(samples,[size,len(samples)-size])
 
     data_loader = torch.utils.data.DataLoader(a,
@@ -145,8 +145,8 @@ weightdecay = 0.01
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 
 
-parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 3, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=50000, dest="samples",type=int)
+parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=4,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=10,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.02,type=float)
