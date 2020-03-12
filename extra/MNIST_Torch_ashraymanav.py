@@ -16,7 +16,6 @@ import copy
 
 '''
 mnist
-
 '''
 #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
 
