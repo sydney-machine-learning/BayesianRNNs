@@ -2,11 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 20 12:02:16 2019
-
 @author: ashrey
 """
-
-
 import torch
 import torch.nn as nn
 import numpy as np
@@ -24,32 +21,26 @@ import datetime
 import multiprocessing
 import gc
 import matplotlib as mpl
-mpl.use('agg')
+import pandas as pd
 
+
+mpl.use('agg')
 mplt = mcmcplt.Mcmcplot()
 weightdecay = 0.01
-
-
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-
-
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=500, dest="samples",type=int)
-parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=4,dest="num_chains",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
+parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default=0.25,type=float)
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.05,type=float)
 parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.1,type=float)
-
 args = parser.parse_args()
-
 def f(): raise Exception("Found exit()")
-
 class Model(nn.Module):
-
         # Defining input size, hidden layer size, output size and batch size respectively
     def __init__(self, topo,lrate,rnn_net = 'RNN'):
         super(Model, self).__init__()
@@ -62,42 +53,39 @@ class Model(nn.Module):
         if rnn_net == 'RNN':
             self.hidden = torch.ones(self.n_layers, self.batch_size, self.hidden_dim)
             self.rnn = nn.RNN(input_size = topo[0], hidden_size = topo[1])
-
         if rnn_net == 'GRU':
             self.hidden = torch.ones((self.n_layers,self.batch_size,self.hidden_dim))
             self.rnn = nn.GRU(input_size = topo[0], hidden_size = topo[1])
-
         if rnn_net == 'LSTM':
             self.hidden = (torch.ones((self.n_layers,self.batch_size,self.hidden_dim)), torch.ones((self.n_layers,self.batch_size,self.hidden_dim)))
             self.rnn = nn.LSTM(input_size = topo[0], hidden_size = topo[1])
-
             # Fully connected layer
         self.fc = nn.Linear(topo[1],topo[2])
         self.topo = topo
         print(rnn_net, ' is rnn net')
-
-
     def sigmoid(self, z):
         return 1/(1+torch.exp(-z))
-
     def forward(self, x):
-        outmain=torch.zeros((len(x),self.topo[2]))
+        outmain=torch.zeros((len(x),self.topo[2],1))
         for i,sample in enumerate(x):
             sample = torch.FloatTensor(sample)
-            sample = sample.view(sample.shape[0],1,self.topo[0])
+            # sequence length = 1
+            sample = sample.view(1,1,self.topo[0])
+            # sample = sample.view(sample.shape[0],1,self.topo[0])
             hidden = copy.deepcopy(self.hidden)
             out, h1 = self.rnn(sample, hidden)
             out = self.fc(out[-1])
             out = self.sigmoid(out)
+            out = out.reshape(outmain[i].shape)
             outmain[i,] = copy.deepcopy(out.detach())
+        # print("shape of outmain", outmain.shape)
+        # print("shape of x",x.shape)
         return copy.deepcopy(outmain)
-
     def init_hidden(self, batch_size):
         # This method generates the first hidden state of zeros which we'll use in the forward pass
         # We'll send the tensor holding the hidden state to the device we specified earlier as well
         hidden = torch.zeros(self.n_layers, batch_size, self.hidden_dim)
         return hidden        # Create a brnn -- assuming h0 size = 5 i.e. hidden layer has 5 nuerons
-
     def dictfromlist(self,param):
         dic = {}
         i=0
@@ -106,7 +94,6 @@ class Model(nn.Module):
             i += (self.state_dict()[name]).view(-1).shape[0]
         #self.loadparameters(dic)
         return dic
-        
     def evaluate_proposal(self,x,w=None):
         if w is None:
             y_pred = self.forward(x)
@@ -115,15 +102,12 @@ class Model(nn.Module):
             self.loadparameters(w)
             y_pred = self.forward(x)
             return copy.deepcopy(np.array(y_pred.detach()))
-
-
 #    def loss(self,fx,y):
 #        fx = torch.FloatTensor(fx)
 #        y = torch.FloatTensor(y)
 #        criterion = nn.MSELoss()
 #        loss = criterion(fx,y)
 #        return loss.item()
-
     def langevin_gradient(self,x,y,w):
         #print(w)
         self.loadparameters(w)
@@ -140,8 +124,6 @@ class Model(nn.Module):
             loss.backward()
             optimizer.step()
         return copy.deepcopy(self.state_dict())
-
-
     #returns a np arraylist of weights and biases -- layerwise
     # in order i.e. weight and bias of input and hidden then weight and bias for hidden to out
     def getparameters(self,w = None):
@@ -155,23 +137,16 @@ class Model(nn.Module):
             l=np.concatenate((l,np.array(copy.deepcopy(dic[name])).reshape(-1)),axis=None)
         l = l[2:]
         return l
-
-
     # input a dictionary of same dimensions
     def loadparameters(self,param):
         self.load_state_dict(param)
-
     # input weight dictionary, mean, std dev
     def addnoiseandcopy(self,w,mea,std_dev):
         dic = {}
         for name in (w.keys()):
             dic[name] = copy.deepcopy(w[name]) + torch.zeros(w[name].size()).normal_(mean = mea, std = std_dev)
         return dic
-
-
-
 class ptReplica(multiprocessing.Process):
-
     def __init__(self, use_langevin_gradients, learn_rate,  w,  minlim_param, maxlim_param, samples,trainx,trainy,testx,testy, topology, burn_in, temperature, swap_interval, langevin_prob, path, parameter_queue, main_process,event,rnn_net):
         #MULTIPROCESSING VARIABLES
         multiprocessing.Process.__init__(self)
@@ -202,10 +177,8 @@ class ptReplica(multiprocessing.Process):
         self.sgd_depth = 1 # always should be 1
         self.learn_rate = learn_rate
         self.l_prob = langevin_prob  # can be evaluated for diff problems - if data too large keep this low value since the gradients cost comp time
-
     def rmse(self, pred, actual):
         return np.sqrt(((pred-actual)**2).mean())
-
     '''def likelihood_func(self, fnn, data, w):
         y = data[:, self.topology[0]]
         fx  = fnn.evaluate_proposal(data,w)
@@ -218,15 +191,11 @@ class ptReplica(multiprocessing.Process):
                     z[i,j] = 1
                 lhood += z[i,j]*np.log(prob[i,j])
         return [lhood/self.temperature, fx, rmse]'''
-
     def likelihood_func(self, rnn,x,y, w, tau_sq):
         fx = rnn.evaluate_proposal(x,w)
-        fx = np.array(fx)[:,0]
-        y = np.array(y).reshape(fx.shape)#data[:, self.topology[0]]
         rmse = self.rmse(fx, y)
         loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.square(y-fx)/tau_sq)
         return [np.sum(loss)/self.adapttemp, fx, rmse]
-
     '''def prior_likelihood(self, sigma_squared, nu_1, nu_2, w):
         h = self.topology[1]  # number hidden neurons
         d = self.topology[0]  # number input neurons
@@ -234,7 +203,6 @@ class ptReplica(multiprocessing.Process):
         part2 = 1 / (2 * sigma_squared) * (sum(np.square(w)))
         log_loss = part1 - part2
         return log_loss'''
-
     def prior_likelihood(self, sigma_squared, nu_1, nu_2, w, tausq,rnn):
         h = self.topology[1]  # number hidden neurons
         d = self.topology[0]  # number input neurons
@@ -242,7 +210,6 @@ class ptReplica(multiprocessing.Process):
         part2 = 1 / (2 * sigma_squared) * (sum(np.square(rnn.getparameters(w))))
         log_loss = part1 - part2  - (1 + nu_1) * np.log(tausq) - (nu_2 / tausq)
         return log_loss
-
     def run(self):
         #INITIALISING FOR RNN
         samples = self.samples
@@ -268,13 +235,11 @@ class ptReplica(multiprocessing.Process):
         pred_test  = rnn.evaluate_proposal(x_test, w) #
         eta = np.log(np.var(pred_train - np.array(y_train)))
         tau_pro = np.exp(eta)
-
         sigma_squared = 25
         nu_1 = 0
         nu_2 = 0
         sigma_diagmat = np.zeros((w_size, w_size))  # for Equation 9 in Ref [Chandra_ICONIP2017]
         np.fill_diagonal(sigma_diagmat, step_w)
-
         #delta_likelihood = 0.5 # an arbitrary position
         prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro,rnn)  # takes care of the gradients
         [likelihood, pred_train, rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro)
@@ -298,10 +263,7 @@ class ptReplica(multiprocessing.Process):
                 [likelihood, pred_train, rmsetrain ] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro)
                 [_, pred_test, rmsetest ] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro)
                 init_count = 1
-
-
             lx = np.random.uniform(0,1,1)
-
             if (self.use_langevin_gradients is True) and (lx< self.l_prob):
                 w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w)) # Eq 8
                 w_proposal = rnn.addnoiseandcopy(w_gd,0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
@@ -347,19 +309,19 @@ class ptReplica(multiprocessing.Process):
                 eta = eta_pro
                 acc_train[i+1,] = 0
                 acc_test[i+1,] = 0
-                #print(i,rmsetrain,rmsetest,'accepted')
+                print(i,rmsetrain,rmsetest,'accepted')
                 pos_w[i+ 1,] = rnn.getparameters(w_proposal).reshape(-1)
                 rmse_train[i + 1,] = rmsetrain
                 rmse_test[i + 1,] = rmsetest
             else:
+                print(i,'rejected')
                 pos_w[i+1,] = pos_w[i,]
                 rmse_train[i + 1,] = rmse_train[i,]
                 rmse_test[i + 1,] = rmse_test[i,]
                 acc_train[i+1,] = acc_train[i,]
                 acc_test[i+1,] = acc_test[i,]
-
             if ((i+1) % self.swap_interval == 0 and i != 0 ):
-                print(str(i)+'th sampke running')
+                print(str(i)+'th sample running')
                 w_size = rnn.getparameters(w).reshape(-1).shape[0]
                 param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
@@ -371,7 +333,6 @@ class ptReplica(multiprocessing.Process):
                 eta = param1[w_size]
                 w1_dict = rnn.dictfromlist(w1)
                 rnn.loadparameters(w1_dict)
-
         param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood]),np.asarray([self.adapttemp]),np.asarray([i])])
         self.parameter_queue.put(param)
         self.signal_main.set()
@@ -396,9 +357,7 @@ class ptReplica(multiprocessing.Process):
         file_name = self.path + '/posterior/accept_list/chain_' + str(self.temperature) + '.txt'
         np.savetxt(file_name, accept_list, fmt='%1.4f')
         print('exiting this thread')
-
 class ParallelTempering:
-
     def __init__(self,  use_langevin_gradients, learn_rate, train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, swap_interval, langevin_prob, path,rnn_net = 'RNN'):
         #FNN Chain variables
         self.train_x = train_x
@@ -435,7 +394,6 @@ class ParallelTempering:
         self.model_signature = 0.0
         self.learn_rate = learn_rate
         self.use_langevin_gradients = use_langevin_gradients
-
     def default_beta_ladder(self, ndim, ntemps, Tmax): #https://github.com/konqr/ptemcee/blob/master/ptemcee/sampler.py
         """
         Returns a ladder of :math:`\beta \equiv 1/T` under a geometric spacing that is determined by the
@@ -444,9 +402,7 @@ class ParallelTempering:
         this temperature.  If using adaptive parallel tempering, per `arXiv:1501.05823
         <http://arxiv.org/abs/1501.05823>`_, choosing ``Tmax = inf`` is a safe bet, so long as
         ``ntemps`` is also specified.
-
         """
-
         if type(ndim) != int or ndim < 1:
             raise ValueError('Invalid number of dimensions specified.')
         if ntemps is None and Tmax is None:
@@ -455,8 +411,6 @@ class ParallelTempering:
             raise ValueError('``Tmax`` must be greater than 1.')
         if ntemps is not None and (type(ntemps) != int or ntemps < 1):
             raise ValueError('Invalid number of temperatures specified.')
-
-
         tstep = np.array([25.2741, 7., 4.47502, 3.5236, 3.0232,
                         2.71225, 2.49879, 2.34226, 2.22198, 2.12628,
                         2.04807, 1.98276, 1.92728, 1.87946, 1.83774,
@@ -478,21 +432,17 @@ class ParallelTempering:
                         1.27397, 1.27227, 1.27061, 1.26898, 1.26737,
                         1.26579, 1.26424, 1.26271, 1.26121,
                         1.25973])
-
-
         if ndim > tstep.shape[0]:
             # An approximation to the temperature step at large
             # dimension
             tstep = 1.0 + 2.0*np.sqrt(np.log(4.0))/np.sqrt(ndim)
         else:
             tstep = tstep[ndim-1]
-
         appendInf = False
         if Tmax == np.inf:
             appendInf = True
             Tmax = None
             ntemps = ntemps - 1
-
         if ntemps is not None:
             if Tmax is None:
                 # Determine Tmax from ntemps.
@@ -501,18 +451,14 @@ class ParallelTempering:
             if Tmax is None:
                 raise ValueError('Must specify at least one of ``ntemps'' and '
                                 'finite ``Tmax``.')
-
             # Determine ntemps from Tmax.
             ntemps = int(np.log(Tmax) / np.log(tstep) + 2)
-
         betas = np.logspace(0, -np.log10(Tmax), ntemps)
         if appendInf:
             # Use a geometric spacing, but replace the top-most temperature with
             # infinity.
             betas = np.concatenate((betas, [0]))
-
         return betas
-
     def assign_temperatures(self):
         # #Linear Spacing
         # temp = 2
@@ -521,22 +467,18 @@ class ParallelTempering:
         # 	temp += 2.5 #(self.maxtemp/self.num_chains)
         # 	print (self.temperatures[i])
         #Geometric Spacing
-
         if self.geometric == True:
             betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.maxtemp)
             for i in range(0, self.num_chains):
                 self.temperatures.append(np.inf if betas[i] == 0 else 1.0/betas[i])
                 #print (self.temperatures[i])
         else:
-
             tmpr_rate = (self.maxtemp /self.num_chains)
             temp = 1
             for i in range(0, self.num_chains):
                 self.temperatures.append(temp)
                 temp += tmpr_rate
                 #print(self.temperatures[i])
-
-
     def initialize_chains(self,  burn_in):
         self.burn_in = burn_in
         self.assign_temperatures()
@@ -545,8 +487,6 @@ class ParallelTempering:
         for i in range(0, self.num_chains):
             w = np.random.randn(self.num_param)
             self.chains.append(ptReplica(self.use_langevin_gradients, self.learn_rate, w,  self.minlim_param, self.maxlim_param, self.NumSamples, self.train_x,self.train_y,self.test_x,self.test_y,self.topology,self.burn_in,self.temperatures[i],self.swap_interval, self.langevin_prob, self.path,self.parameter_queue[i],self.wait_chain[i],self.event[i],self.rnn_net))
-
-
     def swap_procedure(self, parameter_queue_1, parameter_queue_2):
         param1 = parameter_queue_1.get()
         param2 = parameter_queue_2.get()
@@ -576,8 +516,6 @@ class ParallelTempering:
             swapped = False
             self.total_swap_proposals+=1
         return param1, param2, swapped
-
-
     def run_chains(self):
         # only adjacent chains can be swapped therefore, the number of proposals is ONE less num_chains
         swap_proposal = np.ones(self.num_chains-1)
@@ -628,11 +566,9 @@ class ParallelTempering:
                 if flag:
                     print("Signal from chain: {}".format(index+1))
                     timeout_count += 1
-
             if timeout_count != self.num_chains:
                 print("Skipping the swap!")
                 continue
-            
             print("Event occured")
             for index in range(0,self.num_chains-1):
                 param_1, param_2, swapped = self.swap_procedure(self.parameter_queue[index],self.parameter_queue[index+1])
@@ -646,10 +582,7 @@ class ParallelTempering:
             for index in range (self.num_chains):
                 self.wait_chain[index].clear()
                 self.event[index].set()
-
-
         print("Joining processes")
-
         #JOIN THEM TO MAIN PROCESS
         for index in range(0,self.num_chains):
             print(index, ' waiting to join')
@@ -664,111 +597,66 @@ class ParallelTempering:
         swap_perc = self.num_swap*100 /self.total_swap_proposals
         return pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_vec , swap_perc,    accept_vec, accept
         # pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,accept_vec, accept = pt.run_chains()
-
-
     def show_results(self):
-
         burnin = int(self.NumSamples*self.burn_in)
-
         likelihood_rep = np.zeros((self.num_chains, self.NumSamples - 1, 2)) # index 1 for likelihood posterior and index 0 for Likelihood proposals. Note all likilihood proposals plotted only
         accept_percent = np.zeros((self.num_chains, 1))
         accept_list = np.zeros((self.num_chains, self.NumSamples ))
-
         pos_w = np.zeros((self.num_chains,self.NumSamples - burnin, self.num_param))
-
         fx_train_all  = np.zeros((self.num_chains,self.NumSamples - burnin, self.train_x.shape[0]))
         rmse_train = np.zeros((self.num_chains,self.NumSamples - burnin))
         acc_train = np.zeros((self.num_chains,self.NumSamples - burnin))
         fx_test_all  = np.zeros((self.num_chains,self.NumSamples - burnin, self.test_x.shape[0]))
         rmse_test = np.zeros((self.num_chains,self.NumSamples - burnin))
         acc_test = np.zeros((self.num_chains,self.NumSamples - burnin))
-
-
-
         for i in range(self.num_chains):
             file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperatures[i])+ '.txt'
             dat = np.loadtxt(file_name)
             pos_w[i,:,:] = dat[burnin:,:]
-
             file_name = self.path + '/posterior/pos_likelihood/'+'chain_' + str(self.temperatures[i]) + '.txt'
             dat = np.loadtxt(file_name)
             likelihood_rep[i, :] = dat[1:]
-
-
             file_name = self.path + '/posterior/accept_list/' + 'chain_'  + str(self.temperatures[i]) + '.txt'
             dat = np.loadtxt(file_name)
             accept_list[i, :] = dat
-
-
             #file_name = self.path+'/predictions/fxtrain_samples_chain_'+ str(self.temperatures[i])+ '.txt'
             #dat = np.loadtxt(file_name)
             #fx_train_all[i,:,:] = dat[burnin:,:]
-
             #file_name = self.path+'/predictions/fxtest_samples_chain_'+ str(self.temperatures[i])+ '.txt'
             #dat = np.loadtxt(file_name)
             #fx_test_all[i,:,:] = dat[burnin:,:]
-
             file_name = self.path+'/predictions/rmse_test_chain_'+ str(self.temperatures[i])+ '.txt'
             dat = np.loadtxt(file_name)
             rmse_test[i,:] = dat[burnin:]
-
             file_name = self.path+'/predictions/rmse_train_chain_'+ str(self.temperatures[i])+ '.txt'
             dat = np.loadtxt(file_name)
             rmse_train[i,:] = dat[burnin:]
-
             file_name = self.path+'/predictions/acc_test_chain_'+ str(self.temperatures[i])+ '.txt'
             dat = np.loadtxt(file_name)
             acc_test[i,:] = dat[burnin:]
-
             file_name = self.path+'/predictions/acc_train_chain_'+ str(self.temperatures[i])+ '.txt'
             dat = np.loadtxt(file_name)
             acc_train[i,:] = dat[burnin:]
-
-
         posterior = pos_w.transpose(2,0,1).reshape(self.num_param,-1)
-
         fx_train = fx_train_all.transpose(2,0,1).reshape(self.train_x.shape[0],-1)  # need to comment this if need to save memory
         fx_test = fx_test_all.transpose(2,0,1).reshape(self.test_x.shape[0],-1)
-
         #fx_test = fxtest_samples.reshape(self.num_chains*(self.NumSamples - burnin), self.testdata.shape[0]) # konarks version
-
-
         likelihood_vec = likelihood_rep.transpose(2,0,1).reshape(2,-1)
-
         rmse_train = rmse_train.reshape(self.num_chains*(self.NumSamples - burnin), 1)
         acc_train = acc_train.reshape(self.num_chains*(self.NumSamples - burnin), 1)
         rmse_test = rmse_test.reshape(self.num_chains*(self.NumSamples - burnin), 1)
         acc_test = acc_test.reshape(self.num_chains*(self.NumSamples - burnin), 1)
-
-
         accept_vec  = accept_list
-
         #print(accept_vec)
-
-
-
-
-
-
-
         accept = np.sum(accept_percent)/self.num_chains
-
         #np.savetxt(self.path + '/pos_param.txt', posterior.T)  # tcoment to save space
-
         np.savetxt(self.path + '/likelihood.txt', likelihood_vec.T, fmt='%1.5f')
-
         np.savetxt(self.path + '/accept_list.txt', accept_list, fmt='%1.2f')
-
         np.savetxt(self.path + '/acceptpercent.txt', [accept], fmt='%1.2f')
-
-
         return posterior, fx_train_all, fx_test_all,   rmse_train, rmse_test,  acc_train, acc_test,  likelihood_vec.T, accept_vec , accept
-
     def make_directory (self, directory):
         if not os.path.exists(directory):
             os.makedirs(directory)
-
-
 def data_loader(filename):
     f=open(filename,'r')
     x=[[[]]]
@@ -808,9 +696,6 @@ def data_loader(filename):
     del x[0]
     del y[0]
     return x,y
-
-
-
 def print_data(x,y):
     # assuming x is 3 dimensional and y is 2 dimensional
     for i in range(0,len(x)):
@@ -818,9 +703,6 @@ def print_data(x,y):
             print(x[i][j])
         print(y[i])
         print(' ')
-
-
-
 def shuffledata(x,y):
     a=[]
     for i in range(0,len(x)):
@@ -832,8 +714,6 @@ def shuffledata(x,y):
         x1.append(x[item])
         y1.append(y[item])
     return x1,y1
-
-
 def load_horizontal(fname):
     f = open(fname,'r')
     x=[[]]
@@ -867,165 +747,107 @@ def load_horizontal(fname):
     if y[0] == [] or y[0] == [[]]:
         del y[0]
     return x,y
-
-
 def main():
-
-
     networks = ['RNN','GRU','LSTM']
     net = networks[args.net-1]
     networks = ['RNN']
+    n_steps_in, n_steps_out = 5,10
+    # Overall_Analysis = pd.read_csv("Results/OverallAnalysis.csv",index_col = 0)
+    # Overall_Analysis=Overall_Analysis.values
+    # Overall_Analysis=Overall_Analysis[:,2:]
 
     for net in networks:
-        for j in range(4, 5) :
+        for j in range(2, 3) :
             print(j, ' out of 15','\n\n\n\n\n\n\n')
             i = j//2
-            problem =	i
-            if problem ==	1:
-                #traindata = np.loadtxt("Data_OneStepAhead/Lazer/train.txt")
-                #testdata	= np.loadtxt("Data_OneStepAhead/Lazer/test.txt")	#
-                name	= "Lazer"
-                x,y = load_horizontal("Data_OneStepAhead/Lazer/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/Lazer/test.txt")
-    
-            if problem ==	2:
-                #traindata = np.loadtxt(  "Data_OneStepAhead/Sunspot/train.txt")
-                #testdata	= np.loadtxt( "Data_OneStepAhead/Sunspot/test.txt")	#
-                name	= "Sunspot"
-                x,y = load_horizontal("Data_OneStepAhead/Sunspot/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/Sunspot/test.txt")
-    
-    
-            if problem ==	3:
-                ##traindata = np.loadtxt("Data_OneStepAhead/Mackey/train.txt")
-                #testdata	= np.loadtxt("Data_OneStepAhead/Mackey/test.txt")  #
-                name	= "Mackey"
-                x,y = load_horizontal("Data_OneStepAhead/Mackey/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/Mackey/test.txt")
-    
-            if problem ==	4:
-                #traindata = np.loadtxt("Data_OneStepAhead/Lorenz/train.txt")
-                #testdata	= np.loadtxt("Data_OneStepAhead/Lorenz/test.txt")  #
-                name	= "Lorenz"
-                x,y = load_horizontal("Data_OneStepAhead/Lorenz/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/Lorenz/test.txt")
-    
-            if problem ==	5:
-                #traindata = np.loadtxt( "Data_OneStepAhead/Rossler/train.txt")
-                #testdata	= np.loadtxt( "Data_OneStepAhead/Rossler/test.txt")	#
-                name	= "Rossler"
-                x,y = load_horizontal("Data_OneStepAhead/Rossler/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/Rossler/test.txt")
-    
-            if problem ==	6:
-                #traindata = np.loadtxt("Data_OneStepAhead/Henon/train.txt")
-                #testdata	= np.loadtxt("Data_OneStepAhead/Henon/test.txt")	#
-                name	= "Henon"
-                x,y = load_horizontal("Data_OneStepAhead/Henon/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/Henon/test.txt")
-    
-            if problem ==	7:
-                #traindata = np.loadtxt("Data_OneStepAhead/ACFinance/train.txt")
-                #testdata	= np.loadtxt("Data_OneStepAhead/ACFinance/test.txt")	#
-                name	= "ACFinance"
-                x,y = load_horizontal("Data_OneStepAhead/ACFinance/train.txt")
-                train_x= x#x[:int(len(x)*0.8)]
-                train_y= y#y[:int(len(y)*0.8)]
-                Input = len(train_x[0][0])
-                Output = len(train_y[0])
-                test_x,test_y =load_horizontal("Data_OneStepAhead/ACFinance/test.txt")
-    
-    
-    
-    
-            train_x = np.array(train_x)
-            train_y = np.array(train_y)
-            test_x = np.array(test_x)
-            test_y = np.array(test_y)
+            problem=i
+            folder = "data/MultiStepAhead"
+            if problem ==1:
+                TrainData = pd.read_csv(folder+"/data/Lazer/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv(folder+"/data/Lazer/test1.csv",index_col = 0)
+                TestData = TestData.values
+                name= "Lazer"
+            if problem ==2:
+                TrainData = pd.read_csv(folder+"/data/Sunspot/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv("../data/Sunspot/test1.csv",index_col = 0)
+                TestData = TestData.values
+                name= "Sunspot"
+            if problem ==3:
+                TrainData = pd.read_csv("../data/Mackey/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv("../data/Mackey/test1.csv",index_col = 0)
+                TestData = TestData.values
+                name="Mackey"
+            if problem ==4:
+                TrainData = pd.read_csv("../data/Lorenz/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv("../data/Lorenz/test1.csv",index_col = 0)
+                TestData = TestData.values  
+                name= "Lorenz"
+            if problem ==5:
+                TrainData = pd.read_csv("../data/Rossler/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv("../data/Rossler/test1.csv",index_col = 0)
+                TestData = TestData.values
+                name= "Rossler"
+            if problem ==6:
+                TrainData = pd.read_csv("../data/Henon/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv("../data/Henon/test1.csv",index_col = 0)
+                TestData = TestData.values
+                name= "Henon"
+            if problem ==7:
+                TrainData = pd.read_csv("../data/ACFinance/train1.csv",index_col = 0)
+                TrainData = TrainData.values
+                TestData = pd.read_csv("../data/ACFinance/test1.csv",index_col = 0)
+                TestData = TestData.values
+                name= "ACFinance" 
+            train_x = np.array(TrainData[:,0:n_steps_in])
+            train_y = np.array(TrainData[:,n_steps_in : n_steps_in+n_steps_out ])
+            test_x = np.array(TestData[:,0:n_steps_in])
+            test_y = np.array(TestData[:,n_steps_in : n_steps_in+n_steps_out])
+            
+            train_x = train_x.reshape(train_x.shape[0],train_x.shape[1],1)
+            train_y = train_y.reshape(train_y.shape[0],train_y.shape[1],1)
+            test_x = test_x.reshape(test_x.shape[0],test_x.shape[1],1)
+            test_y = test_y.reshape(test_y.shape[0],test_y.shape[1],1)
+            print("shapes of train x and y",train_x.shape,train_y.shape)
+            # shapes of train x and y (585, 5) (585, 10)
             ###############################
             #THESE ARE THE HYPERPARAMETERS#
             ###############################
-            print("shapes of train x and y",train_x.shape,train_y.shape)
-            # shapes of train x and y (298, 4, 1) (298, 1)
             Hidden = 5
             #ip = 4 #input
             #output = 1
-            topology = [Input, Hidden, Output]
+            topology = [n_steps_in, Hidden,n_steps_out]
             NumSample = args.samples
             #NumSample = 500
-    
-    
             ###############################
             #THESE ARE THE HYPERPARAMETERS#
             ###############################
-            topology = [Input, Hidden, Output]
-    
             netw = topology
-    
             #print(traindata)
-    
-    
             #y_test =  testdata[:,netw[0]]
             #y_train =  traindata[:,netw[0]]
-    
-    
-    
             maxtemp = args.mt_val
-    
             #swap_ratio =  0.04
-    
             swap_ratio = args.swap_ratio
-    
             num_chains =  args.num_chains
-    
             swap_interval = int(swap_ratio * NumSample/num_chains)    # int(swap_ratio * (NumSample/num_chains)) #how ofen you swap neighbours. note if swap is more than Num_samples, its off
             burn_in = args.burn_in
-    
-    
             learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
-    
             langevn = ""
-            if j%2 == 0:
+            if j%2 == 1:
                 use_langevin_gradients = True  # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
                 langevn = "T"
             else:
                 use_langevin_gradients = False
                 langevn = "F"
                 pass # we dont want to execute this.
-    
-    
-    
             problemfolder = os.getcwd()+'/Res_LG-Lprob_'+net+'/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
-    
             problemfolder_db = 'Res_LG-Lprob_'+net+'/'  # save main results
-    
-    
-    
-    
             filename = ""
             run_nb = 0
             while os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
@@ -1033,7 +855,6 @@ def main():
             if not os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
                 os.makedirs(  problemfolder+name+langevn+'_%s' % (run_nb))
                 path = (problemfolder+ name+langevn+'_%s' % (run_nb))
-    
             filename = ""
             run_nb = 0
             while os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
@@ -1041,174 +862,99 @@ def main():
             if not os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
                 os.makedirs(  problemfolder_db+name+langevn+'_%s' % (run_nb))
                 path_db = (problemfolder_db+ name+langevn+'_%s' % (run_nb))
-    
-    
-    
             resultingfile = open( path+'/master_result_file.txt','a+')
-    
             resultingfile_db = open( path_db+'/master_result_file.txt','a+')
-    
             timer = time.time()
-    
             langevin_prob = 1/10
-    
-    
-    
             pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, swap_interval, langevin_prob, path,rnn_net = net)
-    
             directories = [  path+'/predictions/', path+'/posterior', path+'/results', path+'/surrogate', path+'/surrogate/learnsurrogate_data', path+'/posterior/pos_w',  path+'/posterior/pos_likelihood',path+'/posterior/surg_likelihood',path+'/posterior/accept_list'  ]
-    
             for d in directories:
                 pt.make_directory((filename)+ d)
-    
-    
-    
             pt.initialize_chains(  burn_in)
-    
-    
             pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,    accept_vec, accept = pt.run_chains()
-    
             list_end = accept_vec.shape[1]
             #print(accept_vec.shape)
             #print(accept_vec)
             accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
             accept_per = np.mean(accept_ratio) * 100
-    
             print(accept_per, ' accept_per')
-    
-    
-    
-    
-    
             timer2 = time.time()
-    
             timetotal = (timer2 - timer) /60
             print ((timetotal), 'min taken')
-    
             #PLOTS
-    
             '''acc_tr = np.mean(acc_train [:])
             acctr_std = np.std(acc_train[:])
             acctr_max = np.amax(acc_train[:])
-    
             acc_tes = np.mean(acc_test[:])
             acctest_std = np.std(acc_test[:])
             acctes_max = np.amax(acc_test[:])'''
-    
-    
-    
             rmse_tr = np.mean(rmse_train[:])
             rmsetr_std = np.std(rmse_train[:])
             rmsetr_max = np.amin(rmse_train[:])
-    
             rmse_tes = np.mean(rmse_test[:])
             rmsetest_std = np.std(rmse_test[:])
             rmsetes_max = np.amin(rmse_test[:])
-    
             outres = open(path+'/result.txt', "a+")
             outres_db = open(path_db+'/result.txt', "a+")
-    
             resultingfile = open(problemfolder+'/master_result_file.txt','a+')
             resultingfile_db = open( problemfolder_db+'/master_result_file.txt','a+')
-    
             xv = name+langevn+'_'+ str(run_nb)
-    
             allres =  np.asarray([ problem, NumSample, maxtemp, swap_interval, langevin_prob, learn_rate,  rmse_tr, rmsetr_std, rmsetr_max, rmse_tes, rmsetest_std, rmsetes_max, swap_perc, accept_per, timetotal])
-    
             np.savetxt(outres_db,  allres   , fmt='%1.4f', newline=' '  )
             np.savetxt(resultingfile_db,   allres   , fmt='%1.4f',  newline=' ' )
             np.savetxt(resultingfile_db, [xv]   ,  fmt="%s", newline=' \n' )
-    
-    
             np.savetxt(outres,  allres   , fmt='%1.4f', newline=' '  )
             np.savetxt(resultingfile,   allres   , fmt='%1.4f',  newline=' ' )
             np.savetxt(resultingfile, [xv]   ,  fmt="%s", newline=' \n' )
-    
             x = np.linspace(0, rmse_train.shape[0] , num=rmse_train.shape[0])
-    
-    
-    
             '''plt.plot(x, rmse_train, '.',   label='Test')
             plt.plot(x, rmse_test,  '.', label='Train')
             plt.legend(loc='upper right')
-    
             plt.xlabel('Samples', fontsize=12)
             plt.ylabel('RMSE', fontsize=12)
-    
             plt.savefig(path+'/rmse_samples.png')
             plt.clf()	'''
-    
             plt.plot(  rmse_train, '.',  label='Test')
             plt.plot(  rmse_test,  '.',  label='Train')
             plt.legend(loc='upper right')
-    
             plt.xlabel('Samples', fontsize=12)
             plt.ylabel('RMSE', fontsize=12)
-    
             plt.savefig(path_db+'/rmse_samples.pdf')
             plt.clf()
-    
             plt.plot( rmse_train, '.',   label='Test')
             plt.plot( rmse_test, '.',   label='Train')
             plt.legend(loc='upper right')
-    
             plt.xlabel('Samples', fontsize=12)
             plt.ylabel('RMSE', fontsize=12)
-    
             plt.savefig(path+'/rmse_samples.pdf')
             plt.clf()
-    
-    
-    
-    
             likelihood = likelihood_rep[:,0] # just plot proposed likelihood
             likelihood = np.asarray(np.split(likelihood, num_chains))
-    
-    
-    
-    
         # Plots
             plt.plot(likelihood.T)
-    
             plt.xlabel('Samples', fontsize=12)
             plt.ylabel(' Log-Likelihood', fontsize=12)
-    
             plt.savefig(path+'/likelihood.png')
             plt.clf()
-    
             plt.plot(likelihood.T)
-    
             plt.xlabel('Samples', fontsize=12)
             plt.ylabel(' Log-Likelihood', fontsize=12)
-    
             plt.savefig(path_db+'/likelihood.png')
             plt.clf()
-    
-    
             plt.plot(accept_vec.T )
             plt.xlabel('Samples', fontsize=12)
             plt.ylabel(' Number accepted proposals', fontsize=12)
-    
             plt.savefig(path_db+'/accept.png')
-    
-    
             plt.clf()
-    
-    
             #mpl_fig = plt.figure()
             #ax = mpl_fig.add_subplot(111)
-    
             # ax.boxplot(pos_w)
-    
             # ax.set_xlabel('[W1] [B1] [W2] [B2]')
             # ax.set_ylabel('Posterior')
-    
             # plt.legend(loc='upper right')
-    
             # plt.title("Boxplot of Posterior W (weights and biases)")
             # plt.savefig(path+'/w_pos.png')
             # plt.savefig(path+'/w_pos.svg', format='svg', dpi=600)
-    
             # plt.clf()
             #dir()
             gc.collect()
@@ -1216,8 +962,4 @@ def main():
             resultingfile.close()
             resultingfile_db.close()
             outres_db.close()
-    
-
 if __name__ == "__main__": main()
-
-
