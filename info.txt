@@ -1,0 +1,27 @@
+100k and 50k both samples
+80% langevin
+
+trace plot for diagram
+https://github.com/intelligentEarth/pt-Bayeslands/blob/master/convergence_diagnosis/convergence_test.py
+
+
+https://github.com/rohitash-chandra/research/blob/master/2019/Bayeslands_GCubed2019.pdf
+multicore pt plots - trace plot and posterior
+
+R hat score between 1 and 1.2
+
+
+14-12-20
+sunspot
+8 chains
+galvin rubin diagnosis for one experiment
+10k samples, 50k, 100k samples
+trace plots for some weights
+compare adam with langevin gradient
+
+
+pollution dataset
+from rishabh
+
+I can use trans AI server - 4
+
