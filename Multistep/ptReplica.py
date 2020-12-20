@@ -1,5 +1,5 @@
 import multiprocessing
-from .model import Model
+from model import Model
 import copy
 import numpy as np
 import math

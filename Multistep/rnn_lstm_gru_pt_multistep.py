@@ -20,7 +20,7 @@ import gc
 import matplotlib as mpl
 import pandas as pd
 from model import Model
-
+from parallelTempering import ParallelTempering
 mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
@@ -34,11 +34,7 @@ parser.add_argument('-b','--burn', help='How many samples to discard before dete
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.05,type=float)
 parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.1,type=float)
-args = parser.parse_args()
-
-def f(): raise Exception("Found exit()")
-
-
+args = parser.parse_args()def f(): raise Exception("Found exit()")
 def data_loader(filename):
     f=open(filename,'r')
     x=[[[]]]
@@ -77,8 +73,7 @@ def data_loader(filename):
         y.append(ya)
     del x[0]
     del y[0]
-    return x,y
-def print_data(x,y):
+    return x,ydef print_data(x,y):
     # assuming x is 3 dimensional and y is 2 dimensional
     for i in range(0,len(x)):
         for j in range(0,len(x[i])):
@@ -103,17 +98,13 @@ def load_horizontal(fname):
     y=[]
     while(True):
         count+=1
-        #print(count)
         text = f.readline()
-        #print(text)
         if(text==''):
            break
         if(len(text.split()) == 0):
-            #print(text)
             text=f.readline()
         if(text==''):
            break
-        #print(text)
         a=[]
         for i in range(0,len(text.split(' '))-1):
             #print(text.split(' ')[i].strip())
@@ -128,15 +119,40 @@ def load_horizontal(fname):
         del x[0]
     if y[0] == [] or y[0] == [[]]:
         del y[0]
-    return x,y
-def main():
+return x,y
+def plot_figure(self, lista, title,folder):    list_points =  lista
+    fname = folder
+    size = 20
+    self.make_directory(fname + '/pos_plots')
+    fname = fname + '/pos_plots'
+    fname = self.path
+    width = 9    font = 12    fig = plt.figure(figsize=(10, 12))
+    ax = fig.add_subplot(111)
+    slen = np.arange(0,len(list_points),1)    fig = plt.figure(figsize=(10,12))
+    ax = fig.add_subplot(111)
+    ax.spines['top'].set_color('none')
+    ax.spines['bottom'].set_color('none')
+    ax.spines['left'].set_color('none')
+    ax.spines['right'].set_color('none')
+    ax.tick_params(labelcolor='w', top='off', bottom='off', left='off', right='off')
+    ax.set_title(' Posterior distribution', fontsize=  font+2)#, y=1.02)    ax1 = fig.add_subplot(211)    n, rainbins, patches = ax1.hist(list_points,  bins = 20,  alpha=0.5, facecolor='sandybrown', normed=False)
+    color = ['blue','red', 'pink', 'green', 'purple', 'cyan', 'orange','olive', 'brown', 'black']    ax1.grid(True)
+    ax1.set_ylabel('Frequency',size= font+1)
+    ax1.set_xlabel('Parameter values', size= font+1)    ax2 = fig.add_subplot(212)    list_points = np.asarray(np.split(list_points,  self.num_chains ))    ax2.set_facecolor('#f2f2f3')
+    ax2.plot( list_points.T , label=None)
+    ax2.set_title(r'Trace plot',size= font+2)
+    ax2.set_xlabel('Samples',size= font+1)
+    ax2.set_ylabel('Parameter values', size= font+1)    fig.tight_layout()
+    fig.subplots_adjust(top=0.88)
+    plt.savefig(fname + '/' + title  + '_pos_.png', bbox_inches='tight', dpi=300, transparent=False)
+    plt.clf()def main():
     networks = ['RNN','GRU','LSTM']
     net = networks[args.net-1]
     networks = ['RNN']
     n_steps_in, n_steps_out = 5,10
     for net in networks:
         for j in range(4, 5) :
-            print(j, ' out of 15','\n\n\n\n\n\n\n')
+            print(j, ' out of 15','\n\n\n')
             i = j//2
             problem=i
             folder = "data/MultiStepAhead"
@@ -147,9 +163,9 @@ def main():
                 TestData = TestData.values
                 name= "Lazer"
             if problem ==2:
-                TrainData = pd.read_csv("/data/Sunspot/train1.csv",index_col = 0)
+                TrainData = pd.read_csv("data/Sunspot/train1.csv",index_col = 0)
                 TrainData = TrainData.values
-                TestData = pd.read_csv("/data/Sunspot/test1.csv",index_col = 0)
+                TestData = pd.read_csv("data/Sunspot/test1.csv",index_col = 0)
                 TestData = TestData.values
                 name= "Sunspot"
             if problem ==3:
@@ -181,40 +197,25 @@ def main():
                 TrainData = TrainData.values
                 TestData = pd.read_csv("../data/ACFinance/test1.csv",index_col = 0)
                 TestData = TestData.values
-                name= "ACFinance" 
-            
-            train_x = np.array(TrainData[:,0:n_steps_in])
+                name= "ACFinance"             train_x = np.array(TrainData[:,0:n_steps_in])
             train_y = np.array(TrainData[:,n_steps_in : n_steps_in+n_steps_out ])
             test_x = np.array(TestData[:,0:n_steps_in])
-            test_y = np.array(TestData[:,n_steps_in : n_steps_in+n_steps_out])
-            
-            train_x = train_x.reshape(train_x.shape[0],train_x.shape[1],1)
+            test_y = np.array(TestData[:,n_steps_in : n_steps_in+n_steps_out])            train_x = train_x.reshape(train_x.shape[0],train_x.shape[1],1)
             train_y = train_y.reshape(train_y.shape[0],train_y.shape[1],1)
             test_x = test_x.reshape(test_x.shape[0],test_x.shape[1],1)
             test_y = test_y.reshape(test_y.shape[0],test_y.shape[1],1)
             print("shapes of train x and y",train_x.shape,train_y.shape)
-            # shapes of train x and y (585, 5) (585, 10)
-            ###############################
+            # shapes of train x and y (585, 5) (585, 10)            ###############################
             #THESE ARE THE HYPERPARAMETERS#
             ###############################
             Hidden = 5
-            #ip = 4 #input
-            #output = 1
             topology = [n_steps_in, Hidden,n_steps_out]
             NumSample = args.samples
-            #NumSample = 500
-            ###############################
-            #THESE ARE THE HYPERPARAMETERS#
-            ###############################
             netw = topology
-            #print(traindata)
-            #y_test =  testdata[:,netw[0]]
-            #y_train =  traindata[:,netw[0]]
             maxtemp = args.mt_val
-            #swap_ratio =  0.04
             swap_ratio = args.swap_ratio
             num_chains =  args.num_chains
-            swap_interval = int(swap_ratio * NumSample/num_chains)    # int(swap_ratio * (NumSample/num_chains)) #how ofen you swap neighbours. note if swap is more than Num_samples, its off
+            swap_interval = int(swap_ratio * NumSample/num_chains)   #how ofen you swap neighbours. note if swap is more than Num_samples, its off
             burn_in = args.burn_in
             learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
             langevn = ""

@@ -1,10 +1,10 @@
-from .model import Model
+from model import Model
 import os
 import numpy as np
 import copy
 import multiprocessing
 import datetime
-from .ptReplica import ptReplica
+from ptReplica import ptReplica
 
 class ParallelTempering:
     def __init__(self,  use_langevin_gradients, learn_rate, train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, swap_interval, langevin_prob, path,rnn_net = 'RNN'):
