@@ -3,6 +3,9 @@ import torch
 import copy
 import numpy as np
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 class Model(nn.Module):
         # Defining input size, hidden layer size, output size and batch size respectively
     def __init__(self, topo,lrate,rnn_net = 'RNN'):
@@ -22,6 +25,7 @@ class Model(nn.Module):
         if rnn_net == 'LSTM':
             self.hidden = (torch.ones((self.n_layers,self.batch_size,self.hidden_dim)), torch.ones((self.n_layers,self.batch_size,self.hidden_dim)))
             self.rnn = nn.LSTM(input_size = topo[0], hidden_size = topo[1])
+            self.rnn.to(device)
             # Fully connected layer
         self.fc = nn.Linear(topo[1],topo[2])
         self.topo = topo
@@ -32,10 +36,17 @@ class Model(nn.Module):
         outmain=torch.zeros((len(x),self.topo[2],1))
         for i,sample in enumerate(x):
             sample = torch.FloatTensor(sample)
+            sample.to(device)
             # sequence length = 1
             sample = sample.view(1,1,self.topo[0])
             # sample = sample.view(sample.shape[0],1,self.topo[0])
             hidden = copy.deepcopy(self.hidden)
+            # print(hidden)
+            # raise Exception()
+            # hidden[0].to(device)
+            # hidden[1].to(device)
+            hidden = hidden.to(device)
+            sample = sample.to(device)
             out, h1 = self.rnn(sample, hidden)
             out = self.fc(out[-1])
             out = self.sigmoid(out)
@@ -97,7 +108,9 @@ class Model(nn.Module):
         else:
             dic = copy.deepcopy(w)
         for name in sorted(dic.keys()):
-            l=np.concatenate((l,np.array(copy.deepcopy(dic[name])).reshape(-1)),axis=None)
+            temp = copy.deepcopy(dic[name])
+            temp = temp.cpu()
+            l=np.concatenate((l,np.array(temp).reshape(-1)),axis=None)
         l = l[2:]
         return l
     # input a dictionary of same dimensions
@@ -107,5 +120,5 @@ class Model(nn.Module):
     def addnoiseandcopy(self,w,mea,std_dev):
         dic = {}
         for name in (w.keys()):
-            dic[name] = copy.deepcopy(w[name]) + torch.zeros(w[name].size()).normal_(mean = mea, std = std_dev)
+            dic[name] = copy.deepcopy((w[name]).cpu()) + torch.zeros(w[name].size()).normal_(mean = mea, std = std_dev)
         return dic

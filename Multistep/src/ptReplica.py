@@ -17,10 +17,12 @@ class ptReplica(multiprocessing.Process):
         self.parameter_queue = parameter_queue
         self.signal_main = main_process
         self.event =  event
-        self.rnn = Model(topology,learn_rate,rnn_net=rnn_net)
+        self.rnn = ""
+        self.rnn_net = rnn_net
+        # self.rnn = Model(topology,learn_rate,rnn_net=rnn_net)
         # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # self.rnn.to(device)
-        # print(device," device of rnn")
+        # print(device," device of")
         self.temperature = temperature
         self.adapttemp = temperature
         self.swap_interval = swap_interval
@@ -78,6 +80,10 @@ class ptReplica(multiprocessing.Process):
         return log_loss
     def run(self):
         #INITIALISING FOR RNN
+        self.rnn = Model(self.topology,self.learn_rate,rnn_net=self.rnn_net)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.rnn.to(device)
+        # print(device," device of")        
         samples = self.samples
         x_test = self.test_x
         x_train = self.train_x

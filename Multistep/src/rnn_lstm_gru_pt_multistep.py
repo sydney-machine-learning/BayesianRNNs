@@ -168,6 +168,13 @@ def main():
             test_y = test_y.reshape(test_y.shape[0],test_y.shape[1],1)
             print("shapes of train x and y",train_x.shape,train_y.shape)
             # shapes of train x and y (585, 5) (585, 10)
+            
+            # # making all dataset in torch
+            # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            # train_x = torch.from_numpy(train_x).to(device)
+            # train_y = torch.from_numpy(train_y).to(device)
+            # test_x = torch.from_numpy(test_x).to(device)
+            # test_y = torch.from_numpy(test_y).to(device)
 
             ###############################
             #THESE ARE THE HYPERPARAMETERS#
