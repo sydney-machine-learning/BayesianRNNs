@@ -21,12 +21,14 @@ import matplotlib as mpl
 import pandas as pd
 from model import Model
 from parallelTempering import ParallelTempering
+
+
 mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=100000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
@@ -34,118 +36,74 @@ parser.add_argument('-b','--burn', help='How many samples to discard before dete
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.05,type=float)
 parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.1,type=float)
-args = parser.parse_args()def f(): raise Exception("Found exit()")
-def data_loader(filename):
-    f=open(filename,'r')
-    x=[[[]]]
-    count=0
-    y=[[[]]]
-    while(True):
-        count+=1
-        #print(count)
-        text = f.readline()
-        #print(text)
-        if(text==''):
-           break
-        if(len(text.split()) == 0):
-            #print(text)
-            text=f.readline()
-        if(text==''):
-           break
-        #print(text)
-        t=int(text)
-        a=[[]]
-        ya=[[]]
-        for i in range(0,t):
-            temp=f.readline().split(' ')
-            b=0.0
-            for j in range(0,len(temp)):
-                b=[float(temp[j])]
-            a.append(b)
-        del a[0]
-        x.append(a)
-        temp=f.readline().split(' ')
-        #print(temp)
-        for j in range(0,len(temp)):
-            if temp[j] != "\n":
-                ya.append([float(temp[j])])
-        del ya[0]
-        y.append(ya)
-    del x[0]
-    del y[0]
-    return x,ydef print_data(x,y):
-    # assuming x is 3 dimensional and y is 2 dimensional
-    for i in range(0,len(x)):
-        for j in range(0,len(x[i])):
-            print(x[i][j])
-        print(y[i])
-        print(' ')
-def shuffledata(x,y):
-    a=[]
-    for i in range(0,len(x)):
-        a.append(i)
-    random.shuffle(a)
-    x1 = []
-    y1=[]
-    for item in a:
-        x1.append(x[item])
-        y1.append(y[item])
-    return x1,y1
-def load_horizontal(fname):
-    f = open(fname,'r')
-    x=[[]]
-    count=0
-    y=[]
-    while(True):
-        count+=1
-        text = f.readline()
-        if(text==''):
-           break
-        if(len(text.split()) == 0):
-            text=f.readline()
-        if(text==''):
-           break
-        a=[]
-        for i in range(0,len(text.split(' '))-1):
-            #print(text.split(' ')[i].strip())
-            temp = float(text.split(' ')[i].strip())
-            a.append([temp])
-        y.append([float(text.split(' ')[-1].strip())])
-        if a[0] == []:
-            del a[0]
-        x.append(a)
-        #print(count)
-    if (x[0]) == [] or x[0] == [[]] :
-        del x[0]
-    if y[0] == [] or y[0] == [[]]:
-        del y[0]
-return x,y
-def plot_figure(self, lista, title,folder):    list_points =  lista
+args = parser.parse_args()
+
+def f(): raise Exception("Found exit()")
+
+
+def plot_figure(self, lista, title,folder):
+
+    list_points =  lista
     fname = folder
     size = 20
     self.make_directory(fname + '/pos_plots')
     fname = fname + '/pos_plots'
     fname = self.path
-    width = 9    font = 12    fig = plt.figure(figsize=(10, 12))
+    width = 9
+
+    font = 12
+
+    fig = plt.figure(figsize=(10, 12))
     ax = fig.add_subplot(111)
-    slen = np.arange(0,len(list_points),1)    fig = plt.figure(figsize=(10,12))
+
+
+    slen = np.arange(0,len(list_points),1)
+
+    fig = plt.figure(figsize=(10,12))
     ax = fig.add_subplot(111)
     ax.spines['top'].set_color('none')
     ax.spines['bottom'].set_color('none')
     ax.spines['left'].set_color('none')
     ax.spines['right'].set_color('none')
     ax.tick_params(labelcolor='w', top='off', bottom='off', left='off', right='off')
-    ax.set_title(' Posterior distribution', fontsize=  font+2)#, y=1.02)    ax1 = fig.add_subplot(211)    n, rainbins, patches = ax1.hist(list_points,  bins = 20,  alpha=0.5, facecolor='sandybrown', normed=False)
-    color = ['blue','red', 'pink', 'green', 'purple', 'cyan', 'orange','olive', 'brown', 'black']    ax1.grid(True)
+    ax.set_title(' Posterior distribution', fontsize=  font+2)#, y=1.02)
+
+    ax1 = fig.add_subplot(211)
+
+    n, rainbins, patches = ax1.hist(list_points,  bins = 20,  alpha=0.5, facecolor='sandybrown', normed=False)
+
+
+    color = ['blue','red', 'pink', 'green', 'purple', 'cyan', 'orange','olive', 'brown', 'black']
+
+    ax1.grid(True)
     ax1.set_ylabel('Frequency',size= font+1)
-    ax1.set_xlabel('Parameter values', size= font+1)    ax2 = fig.add_subplot(212)    list_points = np.asarray(np.split(list_points,  self.num_chains ))    ax2.set_facecolor('#f2f2f3')
+    ax1.set_xlabel('Parameter values', size= font+1)
+
+    ax2 = fig.add_subplot(212)
+
+    list_points = np.asarray(np.split(list_points,  self.num_chains ))
+
+    ax2.set_facecolor('#f2f2f3')
     ax2.plot( list_points.T , label=None)
     ax2.set_title(r'Trace plot',size= font+2)
     ax2.set_xlabel('Samples',size= font+1)
-    ax2.set_ylabel('Parameter values', size= font+1)    fig.tight_layout()
+    ax2.set_ylabel('Parameter values', size= font+1)
+
+    fig.tight_layout()
     fig.subplots_adjust(top=0.88)
+
+
     plt.savefig(fname + '/' + title  + '_pos_.png', bbox_inches='tight', dpi=300, transparent=False)
-    plt.clf()def main():
+    plt.clf()
+
+
+
+
+
+def main():
+    print(torch.cuda.is_available(), ' cuda is available?')
+    # model = model.type(gpu_dtype)
+    
     networks = ['RNN','GRU','LSTM']
     net = networks[args.net-1]
     networks = ['RNN']
@@ -163,9 +121,9 @@ def plot_figure(self, lista, title,folder):    list_points =  lista
                 TestData = TestData.values
                 name= "Lazer"
             if problem ==2:
-                TrainData = pd.read_csv("data/Sunspot/train1.csv",index_col = 0)
+                TrainData = pd.read_csv("../data/Sunspot/train1.csv",index_col = 0)
                 TrainData = TrainData.values
-                TestData = pd.read_csv("data/Sunspot/test1.csv",index_col = 0)
+                TestData = pd.read_csv("../data/Sunspot/test1.csv",index_col = 0)
                 TestData = TestData.values
                 name= "Sunspot"
             if problem ==3:
@@ -197,15 +155,21 @@ def plot_figure(self, lista, title,folder):    list_points =  lista
                 TrainData = TrainData.values
                 TestData = pd.read_csv("../data/ACFinance/test1.csv",index_col = 0)
                 TestData = TestData.values
-                name= "ACFinance"             train_x = np.array(TrainData[:,0:n_steps_in])
+                name= "ACFinance" 
+            
+            train_x = np.array(TrainData[:,0:n_steps_in])
             train_y = np.array(TrainData[:,n_steps_in : n_steps_in+n_steps_out ])
             test_x = np.array(TestData[:,0:n_steps_in])
-            test_y = np.array(TestData[:,n_steps_in : n_steps_in+n_steps_out])            train_x = train_x.reshape(train_x.shape[0],train_x.shape[1],1)
+            test_y = np.array(TestData[:,n_steps_in : n_steps_in+n_steps_out])
+            
+            train_x = train_x.reshape(train_x.shape[0],train_x.shape[1],1)
             train_y = train_y.reshape(train_y.shape[0],train_y.shape[1],1)
             test_x = test_x.reshape(test_x.shape[0],test_x.shape[1],1)
             test_y = test_y.reshape(test_y.shape[0],test_y.shape[1],1)
             print("shapes of train x and y",train_x.shape,train_y.shape)
-            # shapes of train x and y (585, 5) (585, 10)            ###############################
+            # shapes of train x and y (585, 5) (585, 10)
+
+            ###############################
             #THESE ARE THE HYPERPARAMETERS#
             ###############################
             Hidden = 5
@@ -253,8 +217,16 @@ def plot_figure(self, lista, title,folder):    list_points =  lista
             pt.initialize_chains(  burn_in)
             pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,    accept_vec, accept = pt.run_chains()
             list_end = accept_vec.shape[1]
-            #print(accept_vec.shape)
-            #print(accept_vec)
+
+            ''' to plot ax plots '''
+            
+            
+            print(pos_w.shape, ' is shape of pos w')
+            plot_fname = path
+            for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
+                plot_figure(pos_w[s,:], 'pos_distri_'+str(s),plot_fname) 
+            print(' images placed in folder with name: ',path)
+
             accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
             accept_per = np.mean(accept_ratio) * 100
             print(accept_per, ' accept_per')
@@ -342,4 +314,5 @@ def plot_figure(self, lista, title,folder):    list_points =  lista
             resultingfile.close()
             resultingfile_db.close()
             outres_db.close()
+
 if __name__ == "__main__": main()

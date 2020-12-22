@@ -1,10 +1,13 @@
 import multiprocessing
+
+from torch import device
 from model import Model
 import copy
 import numpy as np
 import math
 import random
 import time
+import torch
 
 class ptReplica(multiprocessing.Process):
     def __init__(self, use_langevin_gradients, learn_rate,  w,  minlim_param, maxlim_param, samples,trainx,trainy,testx,testy, topology, burn_in, temperature, swap_interval, langevin_prob, path, parameter_queue, main_process,event,rnn_net):
@@ -15,6 +18,9 @@ class ptReplica(multiprocessing.Process):
         self.signal_main = main_process
         self.event =  event
         self.rnn = Model(topology,learn_rate,rnn_net=rnn_net)
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.rnn.to(device)
+        # print(device," device of rnn")
         self.temperature = temperature
         self.adapttemp = temperature
         self.swap_interval = swap_interval
@@ -175,7 +181,6 @@ class ptReplica(multiprocessing.Process):
                 rmse_train[i + 1,] = rmsetrain
                 rmse_test[i + 1,] = rmsetest
             else:
-                print(i,'rejected')
                 pos_w[i+1,] = pos_w[i,]
                 rmse_train[i + 1,] = rmse_train[i,]
                 rmse_test[i + 1,] = rmse_test[i,]
