@@ -4,6 +4,7 @@
 Created on Thu Jun 20 12:02:16 2019
 @author: ashrey
 """
+from os import path
 import torch
 import torch.nn as nn
 import numpy as np
@@ -28,37 +29,28 @@ weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
-parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=50000, dest="samples",type=int)
+parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default=0.25,type=float)
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.05,type=float)
-parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.1,type=float)
+parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.05,type=float)
 args = parser.parse_args()
 
 def f(): raise Exception("Found exit()")
 
 
-def plot_figure(self, lista, title,folder):
+
+def plot_figure(lista, title,path):
 
     list_points =  lista
-    fname = folder
     size = 20
-    self.make_directory(fname + '/pos_plots')
-    fname = fname + '/pos_plots'
-    fname = self.path
+    fname = path
     width = 9
 
     font = 12
-
-    fig = plt.figure(figsize=(10, 12))
-    ax = fig.add_subplot(111)
-
-
-    slen = np.arange(0,len(list_points),1)
-
     fig = plt.figure(figsize=(10,12))
     ax = fig.add_subplot(111)
     ax.spines['top'].set_color('none')
@@ -81,7 +73,7 @@ def plot_figure(self, lista, title,folder):
 
     ax2 = fig.add_subplot(212)
 
-    list_points = np.asarray(np.split(list_points,  self.num_chains ))
+    list_points = np.asarray(np.split(list_points,  args.num_chains ))
 
     ax2.set_facecolor('#f2f2f3')
     ax2.plot( list_points.T , label=None)
@@ -94,7 +86,7 @@ def plot_figure(self, lista, title,folder):
 
 
     plt.savefig(fname + '/' + title  + '_pos_.png', bbox_inches='tight', dpi=300, transparent=False)
-    plt.clf()
+    plt.close()
 
 
 
@@ -223,8 +215,9 @@ def main():
             
             print(pos_w.shape, ' is shape of pos w')
             plot_fname = path
+            pt.make_directory(plot_fname + '/pos_plots')
             for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
-                plot_figure(pos_w[s,:], 'pos_distri_'+str(s),plot_fname) 
+                plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path) 
             print(' images placed in folder with name: ',path)
 
             accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
