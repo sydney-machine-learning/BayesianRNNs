@@ -1,5 +1,7 @@
 100k and 50k both samples
 80% langevin
+keep with langevin,
+
 
 trace plot for diagram
 https://github.com/intelligentEarth/pt-Bayeslands/blob/master/convergence_diagnosis/convergence_test.py
@@ -25,3 +27,22 @@ from rishabh
 
 I can use trans AI server - 4
 
+
+Trace plots
+From Rohitash Chandra to Everyone:  11:44 AM
+https://github.com/rohitash-chandra/Bayesianlogisticreg_multioutputs/blob/ac0cbdadd298bacb24f3eff710c9b99a8f505f3d/logisticreg_Bayes_classification.py#L408
+https://github.com/rohitash-chandra/Bayesianlogisticreg_multioutputs/blob/ac0cbdadd298bacb24f3eff710c9b99a8f505f3d/logisticreg_Bayes_classification.py#L408
+
+
+
+look at manav's bayesian CNN
+and Mahir - bayesian autoencoder
+both are using adam and sgd and compare them.
+
+
+from shaurya's paper
+RMSE  across 10 prediction horizons
+and 10 step look ahead prediction
+
+
+talk to animesh for the wrong loss - log loss in shaurya's code

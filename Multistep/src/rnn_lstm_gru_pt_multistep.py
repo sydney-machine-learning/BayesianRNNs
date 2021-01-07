@@ -29,7 +29,7 @@ weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
 parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=50000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=100000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
@@ -43,11 +43,44 @@ def f(): raise Exception("Found exit()")
 
 
 
+def histogram_trace(pos_points, fname): # this is function to plot (not part of class)
+        
+    size = 15
+
+    plt.tick_params(labelsize=size)
+    params = {'legend.fontsize': size, 'legend.handlelength': 2}
+    plt.rcParams.update(params)
+    plt.grid(alpha=0.75)
+
+    plt.hist(pos_points,  bins = 20, color='#0504aa', alpha=0.7)   
+    plt.title("Posterior distribution ", fontsize = size)
+    plt.xlabel(' Parameter value  ', fontsize = size)
+    plt.ylabel(' Frequency ', fontsize = size) 
+    plt.tight_layout()  
+    plt.savefig(fname + '_posterior.png')
+    plt.clf()
+
+
+    plt.tick_params(labelsize=size)
+    params = {'legend.fontsize': size, 'legend.handlelength': 2}
+    plt.rcParams.update(params)
+    plt.grid(alpha=0.75) 
+    plt.plot(pos_points)   
+
+    plt.title("Parameter trace plot", fontsize = size)
+    plt.xlabel(' Number of Samples  ', fontsize = size)
+    plt.ylabel(' Parameter value ', fontsize = size)
+    plt.tight_layout()  
+    plt.savefig(fname  + '_trace.png')
+    plt.clf()
+
+
+
 def plot_figure(lista, title,path):
 
     list_points =  lista
     size = 20
-    fname = path
+    fname = path+'/trace_plots'
     width = 9
 
     font = 12
@@ -83,7 +116,8 @@ def plot_figure(lista, title,path):
 
     fig.tight_layout()
     fig.subplots_adjust(top=0.88)
-
+    if not os.path.exists(fname):
+        os.makedirs(fname)
 
     plt.savefig(fname + '/' + title  + '_pos_.png', bbox_inches='tight', dpi=300, transparent=False)
     plt.close()
@@ -307,5 +341,9 @@ def main():
             resultingfile.close()
             resultingfile_db.close()
             outres_db.close()
+            if not os.path.exists(path+ '/trace_plots_better'):
+                os.makedirs(path+ '/trace_plots_better')
+            for i in range(pos_w.shape[1]):
+                histogram_trace(pos_w[:,i], path+ '/trace_plots_better/'+ str(i))
 
 if __name__ == "__main__": main()
