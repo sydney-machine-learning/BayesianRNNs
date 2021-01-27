@@ -46,3 +46,8 @@ and 10 step look ahead prediction
 
 
 talk to animesh for the wrong loss - log loss in shaurya's code
+
+20-01
+first step_w make it square. 
+then report results to rohit.
+then make adaptive learning rate, 0.1 and then 0.05 and then 0.01

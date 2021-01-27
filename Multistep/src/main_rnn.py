@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 20 12:02:16 2019
-@author: ashrey
+@author: ashray
 """
 from os import path
 import torch
@@ -38,9 +38,6 @@ parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samp
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.05,type=float)
 parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.05,type=float)
 args = parser.parse_args()
-
-def f(): raise Exception("Found exit()")
-
 
 
 def histogram_trace(pos_points, fname): # this is function to plot (not part of class)
@@ -126,10 +123,7 @@ def plot_figure(lista, title,path):
 
 
 
-def main():
-    print(torch.cuda.is_available(), ' cuda is available?')
-    # model = model.type(gpu_dtype)
-    
+def main():    
     networks = ['RNN','GRU','LSTM']
     net = networks[args.net-1]
     networks = ['RNN']
@@ -254,6 +248,12 @@ def main():
                 plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path) 
             print(' images placed in folder with name: ',path)
 
+            if not os.path.exists(path+ '/trace_plots_better'):
+                os.makedirs(path+ '/trace_plots_better')
+            for i in range(pos_w.shape[0]):
+                histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
+
+
             accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
             accept_per = np.mean(accept_ratio) * 100
             print(accept_per, ' accept_per')
@@ -341,9 +341,5 @@ def main():
             resultingfile.close()
             resultingfile_db.close()
             outres_db.close()
-            if not os.path.exists(path+ '/trace_plots_better'):
-                os.makedirs(path+ '/trace_plots_better')
-            for i in range(pos_w.shape[1]):
-                histogram_trace(pos_w[:,i], path+ '/trace_plots_better/'+ str(i))
 
 if __name__ == "__main__": main()

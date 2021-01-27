@@ -105,7 +105,7 @@ class ptReplica(multiprocessing.Process):
         nu_1 = 0
         nu_2 = 0
         sigma_diagmat = np.zeros((w_size, w_size))  # for Equation 9 in Ref [Chandra_ICONIP2017]
-        np.fill_diagonal(sigma_diagmat, step_w)
+        np.fill_diagonal(sigma_diagmat, step_w**2)
         #delta_likelihood = 0.5 # an arbitrary position
         prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro,rnn)  # takes care of the gradients
         [likelihood, pred_train, rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro)
@@ -139,7 +139,7 @@ class ptReplica(multiprocessing.Process):
                 #second = np.log(multivariate_normal.pdf(w_proposal , w_gd , sigma_diagmat)) # this gives numerical instability - hence we give a simple implementation next that takes out log
                 wc_delta = (rnn.getparameters(w)- rnn.getparameters(w_prop_gd))
                 wp_delta = (rnn.getparameters(w_proposal) - rnn.getparameters(w_gd))
-                sigma_sq = step_w
+                sigma_sq = step_w ** 2
                 first = -0.5 * np.sum(wc_delta  *  wc_delta  ) / sigma_sq  # this is wc_delta.T  *  wc_delta /sigma_sq
                 second = -0.5 * np.sum(wp_delta * wp_delta ) / sigma_sq
                 diff_prop =  first - second
