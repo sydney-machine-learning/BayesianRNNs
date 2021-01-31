@@ -129,7 +129,7 @@ def main():
     networks = ['RNN']
     n_steps_in, n_steps_out = 5,10
     for net in networks:
-        for j in range(4, 5) :
+        for j in range(5, 6) :
             print(j, ' out of 15','\n\n\n')
             i = j//2
             problem=i

@@ -72,12 +72,12 @@ class Model(nn.Module):
 #        loss = criterion(fx,y)
 #        return loss.item()
     def langevin_gradient(self,x,y,w):
-        #print(w)
         self.loadparameters(w)
         criterion = torch.nn.MSELoss()
         optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
         for i,sample in enumerate(x):
-            sample = torch.FloatTensor(sample).view(sample.shape[0],1,self.topo[0])
+            sample = torch.FloatTensor(sample)
+            sample = sample.view(1,1,self.topo[0])
             hidden = copy.deepcopy(self.hidden)
             optimizer.zero_grad()
             out, h1 = self.rnn(sample, hidden)
