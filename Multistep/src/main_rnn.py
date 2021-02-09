@@ -28,8 +28,8 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 1, dest="net",type=int)
-parser.add_argument('-s','--samples', help='Number of samples', default=100000, dest="samples",type=int)
+parser.add_argument('-n','--net', help='Choose rnn net, "1" for RNN, "2" for GRU, "3" for LSTM', default = 3, dest="net",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=1000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=3,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
@@ -126,18 +126,19 @@ def plot_figure(lista, title,path):
 def main():    
     networks = ['RNN','GRU','LSTM']
     net = networks[args.net-1]
-    networks = ['RNN']
     n_steps_in, n_steps_out = 5,10
     for net in networks:
+        if net != networks[args.net-1]:
+            continue
         for j in range(2, 15) :
             print(j, ' out of 15','\n\n\n')
             i = j//2
             problem=i
-            folder = "data/MultiStepAhead"
+            folder = ".."
             if problem ==1:
-                TrainData = pd.read_csv(folder+"/data/Lazer/train1.csv",index_col = 0)
+                TrainData = pd.read_csv("../data/Lazer/train1.csv",index_col = 0)
                 TrainData = TrainData.values
-                TestData = pd.read_csv(folder+"/data/Lazer/test1.csv",index_col = 0)
+                TestData = pd.read_csv("../data/Lazer/test1.csv",index_col = 0)
                 TestData = TestData.values
                 name= "Lazer"
             if problem ==2:

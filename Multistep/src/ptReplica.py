@@ -204,7 +204,7 @@ class ptReplica(multiprocessing.Process):
         self.signal_main.set()
         print ((num_accepted*100 / (samples * 1.0)), '% was accepted')
         accept_ratio = num_accepted / (samples * 1.0) * 100
-        print ((langevin_count*100 / (samples * 1.0)), '% was Lsnngrevin ')
+        print ((langevin_count*100 / (samples * 1.0)), '% was Langevin')
         langevin_ratio = langevin_count / (samples * 1.0) * 100
         file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperature)+ '.txt'
         np.savetxt(file_name,pos_w )
