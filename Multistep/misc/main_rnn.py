@@ -248,15 +248,15 @@ def main():
 
         print(pos_w.shape, ' is shape of pos w \nInitiating Plotting Sequence')
         plot_fname = path
-        # # pt.make_directory(plot_fname + '/pos_plots')
-        # for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
-        #     plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
-        # print(' images placed in folder with name: ',path)
+        # pt.make_directory(plot_fname + '/pos_plots')
+        for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
+            plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
+        print(' images placed in folder with name: ',path)
 
-        # if not os.path.exists(path+ '/trace_plots_better'):
-        #     os.makedirs(path+ '/trace_plots_better')
-        # for i in range(pos_w.shape[0]):
-        #     histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
+        if not os.path.exists(path+ '/trace_plots_better'):
+            os.makedirs(path+ '/trace_plots_better')
+        for i in range(pos_w.shape[0]):
+            histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
 
         #Plot to compare the rmse accross all the chains
         font = 12
@@ -332,6 +332,7 @@ def main():
         # outres_step_db = open(path + '/result_stepwise.txt', 'a+')
         resultingfile = open(problemfolder+'/master_result_file.txt','a+')
         resultingfile_step = open(problemfolder + '/master_step_result_file.txt', 'a+')
+        #in this file i will store the table after confirming my doubt from ayush
         resultingfile_db = open( problemfolder_db+'/master_result_file.txt','a+')
         xv = name+langevn+'_'+ str(run_nb)
         step_wise_results = np.concatenate(
