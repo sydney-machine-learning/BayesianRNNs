@@ -317,7 +317,10 @@ class ParallelTempering:
         print('total swap proposal',self.total_swap_proposals)
         print('num samples', self.NumSamples)
         print('swap interval',self.swap_interval)
-        swap_perc = self.num_swap*100 /self.total_swap_proposals
+        try:
+            swap_perc = self.num_swap*100 /self.total_swap_proposals
+        except ZeroDivisionError:
+            swap_perc = 0
         return pos_w, fx_train, fx_test, rmse_train, rmse_test, indiv_rmse_train, indiv_rmse_test, likelihood_vec, swap_perc, accept_vec, accept
         # pos_w, fx_train, fx_test,  rmse_train, rmse_test, acc_train, acc_test,   likelihood_rep , swap_perc,accept_vec, accept = pt.run_chains()
 
