@@ -23,8 +23,8 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=100, dest="samples",type=int)
-parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=2,dest="num_chains",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=100000, dest="samples",type=int)
+parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=10,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.1,type=float)
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default = 0.5,type=float)
@@ -121,7 +121,7 @@ def main():
     print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
     
-    for j in range(4, 6) :
+    for j in range(5, 6) :
         print(j, ' out of 15','\n\n\n')
         i = j//2
         problem=i
@@ -202,6 +202,7 @@ def main():
             use_langevin_gradients = False
             langevn = "F"
             pass # we dont want to execute this.
+        print(f'langevin is {use_langevin_gradients}')
         problemfolder = os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{num_chains}chains/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
         problemfolder_db = 'Res_LG-Lprob_'+net+ f'_{optimizer}_{num_chains}chains/'  # save main results
         filename = ""
@@ -221,7 +222,7 @@ def main():
         # resultingfile = open( path+'/master_result_file.txt','a+')
         # resultingfile_db = open( path_db+'/master_result_file.txt','a+')
         timer = time.time()
-        langevin_prob = 1/10
+        langevin_prob = 9/10
         pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, 
                                 swap_interval, langevin_prob, path,rnn_net = net, optimizer= optimizer)
         directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
