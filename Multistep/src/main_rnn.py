@@ -23,7 +23,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=50000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=2000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.01,type=float)
@@ -121,10 +121,10 @@ def main():
     print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
     
-    for j in range(5, 6) :
+    for j in range(2, 3) :
         print(j, ' out of 15','\n\n\n')
-        i = j//2
-        problem=i
+        #i = j//2
+        problem=j
         folder = ".."
         if problem ==1:
             TrainData = pd.read_csv("../data/Lazer/train1.csv",index_col = 0)
@@ -195,13 +195,13 @@ def main():
         burn_in = args.burn_in
         learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
         langevn = ""
-        if j%2 == 1:
-            use_langevin_gradients = True  # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
-            langevn = "T"
-        else:
-            use_langevin_gradients = False
-            langevn = "F"
-            pass # we dont want to execute this.
+        #if j%2 == 1:
+        use_langevin_gradients = True  # False leaves it as Random-walk proposals. Note that Langevin gradients will take a bit more time computationally
+        #langevn = "T"
+        #else:
+        #   use_langevin_gradients = False
+        #   langevn = "F"
+        #   pass # we dont want to execute this.
         print(f'langevin is {use_langevin_gradients}')
         problemfolder = os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{num_chains}chains/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
         problemfolder_db = 'Res_LG-Lprob_'+net+ f'_{optimizer}_{num_chains}chains/'  # save main results
