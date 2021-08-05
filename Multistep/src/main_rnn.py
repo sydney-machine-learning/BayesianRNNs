@@ -222,7 +222,7 @@ def main():
         # resultingfile = open( path+'/master_result_file.txt','a+')
         # resultingfile_db = open( path_db+'/master_result_file.txt','a+')
         timer = time.time()
-        langevin_prob = 9/10
+        langevin_prob = 0.9
         pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, 
                                 swap_interval, langevin_prob, path,rnn_net = net, optimizer= optimizer)
         directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
