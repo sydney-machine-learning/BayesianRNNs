@@ -5,25 +5,20 @@ import numpy as np
 
 class Model(nn.Module):
         # Defining input size, hidden layer size, output size and batch size respectively
-    def __init__(self, topo,lrate,rnn_net = 'RNN', optimizer = 'SGD'):
-        """
-            rnn_net = RNN/LSTM
-            optimizer = Adam/ SGD
-        """
+    def __init__(self, topo,lrate,rnn_net = 'RNN'):
         super(Model, self).__init__()
         # assuming num_dicrections to be 1 for all the cases
         # Defining some parameters
         self.hidden_dim = topo[1]#hidden_dim
-        self.n_layers = 2 if rnn_net is 'RNN' else 1   #len(topo)-2 #n_layers
+        self.n_layers = 1#len(topo)-2 #n_layers
         self.batch_size = 1
         self.lrate = lrate
-        self.optimizer = optimizer
         if rnn_net == 'RNN':
             self.hidden = torch.ones(self.n_layers, self.batch_size, self.hidden_dim)
-            self.rnn = nn.RNN(input_size = topo[0], hidden_size = topo[1], num_layers = self.n_layers)
-        # if rnn_net == 'GRU':
-        #     self.hidden = torch.ones((self.n_layers,self.batch_size,self.hidden_dim))
-        #     self.rnn = nn.GRU(input_size = topo[0], hidden_size = topo[1])
+            self.rnn = nn.RNN(input_size = topo[0], hidden_size = topo[1])
+        if rnn_net == 'GRU':
+            self.hidden = torch.ones((self.n_layers,self.batch_size,self.hidden_dim))
+            self.rnn = nn.GRU(input_size = topo[0], hidden_size = topo[1])
         if rnn_net == 'LSTM':
             self.hidden = (torch.ones((self.n_layers,self.batch_size,self.hidden_dim)), torch.ones((self.n_layers,self.batch_size,self.hidden_dim)))
             self.rnn = nn.LSTM(input_size = topo[0], hidden_size = topo[1])
@@ -77,13 +72,9 @@ class Model(nn.Module):
 #        loss = criterion(fx,y)
 #        return loss.item()
     def langevin_gradient(self,x,y,w):
-
         self.loadparameters(w)
         criterion = torch.nn.MSELoss()
-        if self.optimizer == 'SGD':
-            optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
-        elif self.optimizer == 'Adam':
-            optimizer = torch.optim.Adam(self.parameters(),lr = self.lrate)
+        optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
         for i,sample in enumerate(x):
             sample = torch.FloatTensor(sample)
             sample = sample.view(1,1,self.topo[0])
