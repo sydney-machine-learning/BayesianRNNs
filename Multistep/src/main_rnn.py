@@ -23,7 +23,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=2000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.01,type=float)
@@ -121,7 +121,7 @@ def main():
     print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
     
-    for j in range(2, 3) :
+    for j in [1,2,3,6] :
         print(j, ' out of 15','\n\n\n')
         #i = j//2
         problem=j
@@ -191,7 +191,7 @@ def main():
         maxtemp = args.mt_val
         swap_ratio = args.swap_ratio
         num_chains =  args.num_chains
-        swap_interval = 10 #use 10 or 15 according to your latest scolding #int(swap_ratio * NumSample/num_chains)   #how ofen you swap neighbours. note if swap is more than Num_samples, its off
+        swap_interval = 5  #int(swap_ratio * NumSample/num_chains)   #how ofen you swap neighbours. note if swap is more than Num_samples, its off
         burn_in = args.burn_in
         learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
         langevn = ""
