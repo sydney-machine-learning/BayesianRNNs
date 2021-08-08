@@ -128,7 +128,7 @@ class ptReplica(multiprocessing.Process):
         accept_list = np.zeros(samples)
         num_accepted = 0
         langevin_count = 0
-        pt_samples = samples * 0.5 # this means that PT in canonical form with adaptive temp will work till pt  samples are reached
+        pt_samples = samples * 0.6 # this means that PT in canonical form with adaptive temp will work till pt  samples are reached
         init_count = 0
         self.event.clear()
         i=0
