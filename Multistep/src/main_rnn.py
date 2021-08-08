@@ -191,7 +191,9 @@ def main():
         maxtemp = args.mt_val
         swap_ratio = args.swap_ratio
         num_chains =  args.num_chains
-        swap_interval = 5  #int(swap_ratio * NumSample/num_chains)   #how ofen you swap neighbours. note if swap is more than Num_samples, its off
+        swap_interval = 5
+        
+        #int(swap_ratio * NumSample/num_chains)   #how ofen you swap neighbours. note if swap is more than Num_samples, its off
         burn_in = args.burn_in
         learn_rate = args.learn_rate  # in case langevin gradients are used. Can select other values, we found small value is ok.
         langevn = ""
