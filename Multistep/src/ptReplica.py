@@ -119,8 +119,8 @@ class ptReplica(multiprocessing.Process):
         np.fill_diagonal(sigma_diagmat, step_w**2)
         #delta_likelihood = 0.5 # an arbitrary position
         prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro,rnn)  # takes care of the gradients
-        [likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro)
-        [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro)
+        [likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro, temp= self.temperature)
+        [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro, temp= self.temperature)
         prop_list = np.zeros((samples,w_size))
         likeh_list = np.zeros((samples,2)) # one for posterior of likelihood and the other for all proposed likelihood
         likeh_list[0,:] = [-100, -100] # to avoid prob in calc of 5th and 95th percentile later
@@ -128,7 +128,7 @@ class ptReplica(multiprocessing.Process):
         accept_list = np.zeros(samples)
         num_accepted = 0
         langevin_count = 0
-        pt_samples = samples * 0.6 # this means that PT in canonical form with adaptive temp will work till pt  samples are reached
+        pt_samples = samples * 0.5 # this means that PT in canonical form with adaptive temp will work till pt  samples are reached
         init_count = 0
         self.event.clear()
         i=0
@@ -138,8 +138,8 @@ class ptReplica(multiprocessing.Process):
                 self.adapttemp =  self.temperature #* ratio  #
             if i == pt_samples and init_count ==0: # move to MCMC canonical
                 self.adapttemp = 1
-                [likelihood, pred_train, rmsetrain, step_wise_rmsetrain ] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro)
-                [_, pred_test, rmsetest, step_wise_rmsetest ] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro)
+                [likelihood, pred_train, rmsetrain, step_wise_rmsetrain ] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro, temp= self.adapttemp)
+                [_, pred_test, rmsetest, step_wise_rmsetest ] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro, temp= self.adapttemp)
                 init_count = 1
             lx = np.random.uniform(0,1,1)
             if (self.use_langevin_gradients is True) and (lx< self.l_prob):
@@ -161,8 +161,8 @@ class ptReplica(multiprocessing.Process):
                 w_proposal = rnn.addnoiseandcopy(w,0,step_w) #np.random.normal(w, step_w, w_size)
             eta_pro = eta + np.random.normal(0, step_eta, 1)
             tau_pro = math.exp(eta_pro)
-            [likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w_proposal,tau_pro)
-            [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x,self.test_y, w_proposal,tau_pro)
+            [likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w_proposal,tau_pro, temp= self.adapttemp)
+            [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x,self.test_y, w_proposal,tau_pro, temp= self.adapttemp)
             # print(step_wise_rmsetest.shape,"shape of step wise rmse")
             prior_prop = self.prior_likelihood(sigma_squared, nu_1, nu_2, w_proposal,tau_pro,rnn)  # takes care of the gradients
             diff_prior = prior_prop - prior_current
@@ -172,6 +172,7 @@ class ptReplica(multiprocessing.Process):
             try:
                 # mh_prob = min(0, (diff_likelihood + diff_prior + diff_prop))
                 mh_prob = diff_likelihood + diff_prior + diff_prop   #https://github.com/sydney-machine-learning/BayesianAutoencoders/blob/239a2ab9e81fc6b95cb60303303377b0dac37b7c/Bayesian/Parallel_Tempering_Tabular.py#L519
+                # mh_prob = min(1, math.exp(diff_likelihood+ diff_prior + diff_prop , dtype = np.float128)) #as given in paper
                 # mh_prob = math.exp(mh_prob)
             except OverflowError as e:
                 mh_prob = 1
@@ -179,6 +180,8 @@ class ptReplica(multiprocessing.Process):
             if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
                 x = 0
             u = np.log(random.uniform(0, 1))
+            # u = random.uniform(0,1)
+
             prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
             likeh_list[i+1,0] = likelihood_proposal
             if u < mh_prob:
