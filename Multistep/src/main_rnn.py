@@ -30,9 +30,10 @@ parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",defau
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default = 0.5,type=float)
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.025,type=float)
-parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.1,type=float)
+parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.01,type=float)
 parser.add_argument('-m','--model', help='1 to select RNN, 2 to select LSTM', dest = "net", default = 1, type= int)
 parser.add_argument('-o','--optim', help='1 to select SGD, 2 to select Adam', dest = 'optimizer', default = 1, type = int)
+parser.add_argument('-debug','--debug', help='debug = 0 or 1; when 1 trace plots will not be produced', dest= 'DEBUG', default= 1, type= bool)
 args = parser.parse_args()
 
 
@@ -252,14 +253,18 @@ def main():
         print(pos_w.shape, ' is shape of pos w \nInitiating Plotting Sequence')
         plot_fname = path
         # pt.make_directory(plot_fname + '/pos_plots')
-        for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
-            plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
-        print(' images placed in folder with name: ',path)
+        
+        if args.DEBUG == 0:        
+            for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
+                plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
+            print(' images placed in folder with name: ',path)
 
-        if not os.path.exists(path+ '/trace_plots_better'):
-            os.makedirs(path+ '/trace_plots_better')
-        for i in range(pos_w.shape[0]):
-            histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
+            if not os.path.exists(path+ '/trace_plots_better'):
+                os.makedirs(path+ '/trace_plots_better')
+            for i in range(pos_w.shape[0]):
+                histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
+
+
 
         #Plot to compare the rmse accross all the chains
         font = 12
