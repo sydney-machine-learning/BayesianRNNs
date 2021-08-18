@@ -248,8 +248,10 @@ class ParallelTempering:
         T2 = param2[-1]
 
         #Swapping Probabilities
-        lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, self.train_y, w1, tau_sq_1_vec, temp = T1)
-        lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, self.train_y, w2, tau_sq_2_vec, temp = T2)
+        y_train = np.squeeze(self.train_y, axis = -1)
+        
+        lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w1, tau_sq_1_vec, temp = T1)
+        lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w2, tau_sq_2_vec, temp = T2)
 
 
         try:

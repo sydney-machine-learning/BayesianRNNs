@@ -44,9 +44,13 @@ class ptReplica(multiprocessing.Process):
         self.learn_rate = learn_rate
         self.l_prob = langevin_prob  # can be evaluated for diff problems - if data too large keep this low value since the gradients cost comp time
     def rmse(self, pred, actual):
+        if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
+        if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
         return np.sqrt(((pred-actual)**2).mean())
 
     def step_wise_rmse(self, pred, actual):
+        if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
+        if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
         ans = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
         
         # print("shape of step_wise_rmse: ",ans.shape)
@@ -99,7 +103,7 @@ class ptReplica(multiprocessing.Process):
         # for i in range(s):
         #     loss += np.sum(-0.5*np.log(2*math.pi*tau_sq)) -  (1/(2*tau_sq))*np.sum(np.square(y[i]-fx[i]))
         loss = np.sum(-0.5*np.log(2*math.pi*tau_sq)) - (1/(2*tau_sq))*np.sum(np.square(y-fx), axis = 0) 
-        print("Likelihood: ",np.sum(loss)/temp)
+        # print("Likelihood: ",np.sum(loss)/temp)
         # np.sum reduces the vector into a single value11
         #the likelihood function returns the sum of rmse values for all 10 steps. 
 
