@@ -178,38 +178,78 @@ class ParallelTempering:
     #         swapped = False
     #         self.total_swap_proposals+=1
     #     return param1, param2, swapped
-    def rmse(self, pred, actual):
+    """def rmse(self, pred, actual):
+        if len(actual.shape)>2: actual = np.squeeze(actual)
+        if len(pred.shape) > 2: pred = np.squeeze(pred)
         return np.sqrt(((pred-actual)**2).mean())
+
+    def step_wise_rmse(self, pred, actual):
+        ans = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
+        
+        print("shape of step_wise_rmse: ",ans.shape)
+        return ans"""
     
+    # def likelihood_func(self, rnn,x,y, w, tau_sq, temp= None):
+    #     if temp is None:
+    #         temp = self.adapttemp
+
+    #     fx = rnn.evaluate_proposal(x,w)
+    #     rmse = self.rmse(fx, y)
+    #     loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.square(y-fx)/tau_sq)
+    #     return [np.sum(loss)/temp, fx, rmse]
+
+    """
     def likelihood_func(self, rnn,x,y, w, tau_sq, temp= None):
         if temp is None:
             temp = self.adapttemp
 
         fx = rnn.evaluate_proposal(x,w)
         rmse = self.rmse(fx, y)
-        loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.square(y-fx)/tau_sq)
+        # step_wise_rmse = self.step_wise_rmse(fx,y)
+    
+        
+        '''August 16'''
+        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)     #trial 1
+        print("Shapes before loss: ", y.shape)
+        s = y.shape[0]
+        loss = 0
+        for i in range(s):
+            loss += np.sum(-0.5*np.log(2*math.pi*tau_sq)) -  0.5*np.sum(np.square(y[i]-fx[i])/tau_sq)
+        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq)) - 0.5*np.sum(np.square(y-fx)/tau_sq) 
+        print("Likelihood: ",np.sum(loss)/temp)
+        # np.sum reduces the vector into a single value11
+        #the likelihood function returns the sum of rmse values for all 10 steps. 
         return [np.sum(loss)/temp, fx, rmse]
+    """
+    rmse = ptReplica.rmse
+    step_wise_rmse = ptReplica.step_wise_rmse
+    likelihood_func = ptReplica.likelihood_func
+    
 
     def swap_procedure(self, parameter_queue_1, parameter_queue_2):
         param1 = parameter_queue_1.get()
         param2 = parameter_queue_2.get()
         w1 = param1[0:self.num_param]
         w1 = self.rnn.dictfromlist(w1)
-        eta1 = param1[self.num_param]
-        tau_sq_1 = np.exp(eta1)
-        lhood1 = param1[self.num_param+1]
-        T1 = param1[self.num_param+2]
+        eta1_vec = param1[self.num_param:self.num_param + 10]
+        tau_sq_1_vec = np.exp(eta1_vec)
+        # lhood1 = param1[self.num_param+10]
+        lhood1 = param1[-2]
+        # T1 = param1[self.num_param+10+1]
+        T1 = param1[-1]
 
         w2 = param2[:self.num_param]
         w2 = self.rnn.dictfromlist(w2)
-        eta2 = param2[self.num_param]
-        tau_sq_2 = np.exp(eta2)
-        lhood2 = param2[self.num_param + 1]
-        T2 = param2[self.num_param + 2]
+        eta2_vec = param2[self.num_param: self.num_param + 10]
+        tau_sq_2_vec = np.exp(eta2_vec)
+        # lhood2 = param2[self.num_param + 10 + 0 ]
+        lhood2 = param2[-2]
+        # T2 = param2[self.num_param + 10 + 1]
+        T2 = param2[-1]
 
         #Swapping Probabilities
-        lhood12, dump1, dump2 = self.likelihood_func(self.rnn, self.train_x, self.train_y, w1, tau_sq_1, temp = T1)
-        lhood21, dump1, dump2 = self.likelihood_func(self.rnn, self.train_x, self.train_y, w2, tau_sq_2, temp = T2)
+        lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, self.train_y, w1, tau_sq_1_vec, temp = T1)
+        lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, self.train_y, w2, tau_sq_2_vec, temp = T2)
 
 
         try:
