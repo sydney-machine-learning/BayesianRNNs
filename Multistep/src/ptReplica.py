@@ -46,7 +46,12 @@ class ptReplica(multiprocessing.Process):
     def rmse(self, pred, actual):
         if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
         if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
-        return np.sqrt(((pred-actual)**2).mean())
+        step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
+        old_rmse = np.sqrt(((pred-actual)**2).mean())
+        print(f"old rmse in code: {old_rmse}")
+        new_rmse = np.mean(step_wise_rmse)
+        print(f'new rmse : {new_rmse}')
+        return new_rmse
 
     def step_wise_rmse(self, pred, actual):
         if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
@@ -102,17 +107,41 @@ class ptReplica(multiprocessing.Process):
 
         # for i in range(s):
         #     loss += np.sum(-0.5*np.log(2*math.pi*tau_sq)) -  (1/(2*tau_sq))*np.sum(np.square(y[i]-fx[i]))
+        '''
+        #code finalised on meeting 16th august
         loss = np.sum(-0.5*np.log(2*math.pi*tau_sq)) - (1/(2*tau_sq))*np.sum(np.square(y-fx), axis = 0) 
+        loss = loss[0]
+        '''
+        # print(f"Loss Function as on meeting gives: {np.sum(loss)}")
         # print("Likelihood: ",np.sum(loss)/temp)
         # np.sum reduces the vector into a single value11
         #the likelihood function returns the sum of rmse values for all 10 steps. 
 
-        # debug using for loop and 
-        # use the first value from the 10 likelihoods produced
-        # check the likelihood func from the langevin paper
-
-        return [np.sum(loss)/temp, fx, rmse, step_wise_rmse]
+        # debug using for loop and - not needed; using axis = 0 gives the required response
+        # use the first value from the 10 likelihoods produced -
+        # use the sum of 10 different likelihoods produced - being used till yet
+        # check the likelihood func from the langevin paper - done
+        """August 19"""
+        #extracting 10 different likelihoods for 10 steps each and taking the sum of all losses
+        #function exacted exactly as it is from paper
+        '''
+        N = y.shape[0]
+        loss = (-N/2)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq)
+        print(2*math.pi*tau_sq)
+        loss_0 = loss[0]
+        print(f'Loss function in my experiment: {np.sum(loss)}')
+        print(f'if I remove N from loss functin: {np.sum((-1/2)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq))}')
+        '''
         
+        #Removing N from the function changes likelihood from positive to always negative.
+        #The code that was being followed till yet had the same removal of N
+        loss = (-0.5)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq)
+        loss_0 = loss[0]
+        
+        # return [np.sum(loss)/temp, fx, rmse, step_wise_rmse]
+        return [loss_0/temp, fx, rmse, step_wise_rmse]
+
+
     '''def prior_likelihood(self, sigma_squared, nu_1, nu_2, w):
         h = self.topology[1]  # number hidden neurons
         d = self.topology[0]  # number input neurons
@@ -121,7 +150,7 @@ class ptReplica(multiprocessing.Process):
         log_loss = part1 - part2
         return log_loss'''
 
-    def prior_likelihood(self, sigma_squared, nu_1, nu_2, w, tausq,rnn):  #leave this tausq as it is
+    def prior_likelihood(self, sigma_squared, nu_1, nu_2, w,  tausq,rnn):  #leave this tausq as it is
         h = self.topology[1]  # number hidden neurons
         d = self.topology[0]  # number input neurons
         part1 = -1 * ((len(rnn.getparameters(w))) / 2) * np.log(sigma_squared)
