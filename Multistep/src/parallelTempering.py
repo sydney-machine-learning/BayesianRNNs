@@ -214,7 +214,7 @@ class ParallelTempering:
 
         try:
             swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))
-            print('Swap Proposal: ',swap_proposal)
+            #print('Swap Proposal: ',swap_proposal)
         except OverflowError as e:
             print(f'lhood12: {lhood12}, lhood1: {lhood1}, lhood21: {lhood21}, lhood2: {lhood2}')
             # print("swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))")
@@ -283,15 +283,15 @@ class ParallelTempering:
             print(datetime.datetime.now())
             timeout_count = 0
             for index in range(0,self.num_chains):
-                print("Waiting for chain: {}".format(index+1))
+                #print("Waiting for chain: {}".format(index+1))
                 flag = self.wait_chain[index].wait()
                 if flag:
-                    print("Signal from chain: {}".format(index+1))
+                    #print("Signal from chain: {}".format(index+1))
                     timeout_count += 1
             if timeout_count != self.num_chains:
-                print("Skipping the swap!")
+                #print("Skipping the swap!")
                 continue
-            print("Event occured")
+            #print("Event occured")
             for index in range(0,self.num_chains-1):
                 param_1, param_2, swapped = self.swap_procedure(self.parameter_queue[index],self.parameter_queue[index+1])
                 self.parameter_queue[index].put(param_1)

@@ -14,7 +14,7 @@ class Model(nn.Module):
         # assuming num_dicrections to be 1 for all the cases
         # Defining some parameters
         self.hidden_dim = topo[1]#hidden_dim
-        self.n_layers = 2 if rnn_net is 'RNN' else 1   #len(topo)-2 #n_layers
+        self.n_layers = 1#2 if rnn_net is 'RNN' else 1   #len(topo)-2 #n_layers
         self.batch_size = 1
         self.lrate = lrate
         self.optimizer = optimizer
