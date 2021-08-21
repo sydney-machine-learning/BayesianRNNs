@@ -150,7 +150,9 @@ class ParallelTempering:
         w1 = param1[0:self.num_param]
         w1 = self.rnn.dictfromlist(w1)
         eta1_vec = param1[self.num_param:self.num_param + 10]
-        tau_sq_1_vec = np.exp(eta1_vec)
+        #tau_sq_1_vec = np.exp(eta1_vec)
+
+
         # lhood1 = param1[self.num_param+10]
         lhood1 = param1[-2]
         # T1 = param1[self.num_param+10+1]
@@ -159,6 +161,8 @@ class ParallelTempering:
         w2 = param2[:self.num_param]
         w2 = self.rnn.dictfromlist(w2)
         eta2_vec = param2[self.num_param: self.num_param + 10]
+
+
         tau_sq_2_vec = np.exp(eta2_vec)
         # lhood2 = param2[self.num_param + 10 + 0 ]
         lhood2 = param2[-2]

@@ -191,17 +191,15 @@ class ptReplica(multiprocessing.Process):
             #surg_likeh_list[i+1,0] = likelihood_proposal * self.adapttemp
             #surg_likeh_list[i+1,1] = np.nan
             try:
-                mh_prob = min(0, (diff_likelihood + diff_prior + diff_prop))
-                #mh_prob = diff_likelihood + diff_prior + diff_prop   #https://github.com/sydney-machine-learning/BayesianAutoencoders/blob/239a2ab9e81fc6b95cb60303303377b0dac37b7c/Bayesian/Parallel_Tempering_Tabular.py#L519
-                # mh_prob = min(1, math.exp(diff_likelihood+ diff_prior + diff_prop , dtype = np.float128)) #as given in paper
-                # mh_prob = math.exp(mh_prob)
+                #mh_prob = min(0, (diff_likelihood + diff_prior + diff_prop))
+                mh_prob = diff_likelihood + diff_prior + diff_prop    
             except OverflowError as e:
                 mh_prob = 1
             accept_list[i+1] = num_accepted
             if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
                 x = 0
-            #u = np.log(random.uniform(0, 1))
-            u = random.uniform(0,1)
+            u = np.log(random.uniform(0, 1))
+            #u = random.uniform(0,1)
 
             prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
             likeh_list[i+1,0] = likelihood_proposal

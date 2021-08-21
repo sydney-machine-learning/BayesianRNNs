@@ -23,7 +23,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=2000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -206,8 +206,8 @@ def main():
         #   langevn = "F"
         #   pass # we dont want to execute this.
         print(f'langevin is {use_langevin_gradients}')
-        problemfolder = os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{num_chains}chains/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
-        problemfolder_db = 'Res_LG-Lprob_'+net+ f'_{optimizer}_{num_chains}chains/'  # save main results
+        problemfolder = os.getcwd()+'/Result-summary_'+net+f'_{optimizer}/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
+        problemfolder_db = 'Result-all_'+net+ f'_{optimizer}/'  # save main results
         filename = ""
         run_nb = 0
         while os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
