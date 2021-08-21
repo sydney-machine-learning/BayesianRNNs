@@ -23,7 +23,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=2000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -122,7 +122,7 @@ def main():
     print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
     
-    for j in [1, 2,3,5, 6] :
+    for j in [2, 3, 5, 6] :
         print(j, ' out of 15','\n\n\n')
         #i = j//2
         problem=j
@@ -225,11 +225,7 @@ def main():
         # resultingfile = open( path+'/master_result_file.txt','a+')
         # resultingfile_db = open( path_db+'/master_result_file.txt','a+')
         timer = time.time()
-
-        
         langevin_prob = 0.5
-
-
         pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, 
                                 swap_interval, langevin_prob, path,rnn_net = net, optimizer= optimizer)
         directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
@@ -257,16 +253,15 @@ def main():
         print(pos_w.shape, ' is shape of pos w \nInitiating Plotting Sequence')
         plot_fname = path
         # pt.make_directory(plot_fname + '/pos_plots')
-        for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
+        for s in range(20): # change this if you want to see all pos plots
             plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
         print(' images placed in folder with name: ',path)
 
         if not os.path.exists(path+ '/trace_plots_better'):
             os.makedirs(path+ '/trace_plots_better')
-        for i in range(pos_w.shape[0]):
+        #for i in range(pos_w.shape[0]):
+        for i in range(20):
             histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
-
-
 
         #Plot to compare the rmse accross all the chains
         font = 12
