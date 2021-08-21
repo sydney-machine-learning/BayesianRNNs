@@ -45,10 +45,12 @@ class Model(nn.Module):
             out = self.fc(out[-1])
             out = self.sigmoid(out)
             out = out.reshape(outmain[i].shape)
+            # print(",out.shape)
             outmain[i,] = copy.deepcopy(out.detach())
-        # print("shape of outmain", outmain.shape)
+        # print("shape of outmain", np.squeeze(outmain,axis = -1).shape)
         # print("shape of x",x.shape)
-        return copy.deepcopy(outmain)
+        return copy.deepcopy(np.squeeze(outmain, axis = -1))
+
     def init_hidden(self, batch_size):
         # This method generates the first hidden state of zeros which we'll use in the forward pass
         # We'll send the tensor holding the hidden state to the device we specified earlier as well

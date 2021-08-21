@@ -257,15 +257,16 @@ def main():
         print(pos_w.shape, ' is shape of pos w \nInitiating Plotting Sequence')
         plot_fname = path
         # pt.make_directory(plot_fname + '/pos_plots')
-        for s in range(20): # change this if you want to see all pos plots
+        for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
             plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
         print(' images placed in folder with name: ',path)
 
         if not os.path.exists(path+ '/trace_plots_better'):
             os.makedirs(path+ '/trace_plots_better')
-        #for i in range(pos_w.shape[0]):
-        for i in range(20):
+        for i in range(pos_w.shape[0]):
             histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
+
+
 
         #Plot to compare the rmse accross all the chains
         font = 12
