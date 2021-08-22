@@ -46,15 +46,10 @@ class ParallelTempering:
         self.model_signature = 0.0
         self.learn_rate = learn_rate
         self.use_langevin_gradients = use_langevin_gradients
-    def default_beta_ladder(self, ndim, ntemps, Tmax): #https://github.com/konqr/ptemcee/blob/master/ptemcee/sampler.py
-        """
-        Returns a ladder of :math:`\beta \equiv 1/T` under a geometric spacing that is determined by the
-        arguments ``ntemps`` and ``Tmax``.  The temperature selection algorithm works as follows:
-        Ideally, ``Tmax`` should be specified such that the tempered posterior looks like the prior at
-        this temperature.  If using adaptive parallel tempering, per `arXiv:1501.05823
-        <http://arxiv.org/abs/1501.05823>`_, choosing ``Tmax = inf`` is a safe bet, so long as
-        ``ntemps`` is also specified.
-        """
+
+    def default_beta_ladder(self, ndim, ntemps,
+                            Tmax):   
+
         if type(ndim) != int or ndim < 1:
             raise ValueError('Invalid number of dimensions specified.')
         if ntemps is None and Tmax is None:
@@ -63,38 +58,31 @@ class ParallelTempering:
             raise ValueError('``Tmax`` must be greater than 1.')
         if ntemps is not None and (type(ntemps) != int or ntemps < 1):
             raise ValueError('Invalid number of temperatures specified.')
-        tstep = np.array([25.2741, 7., 4.47502, 3.5236, 3.0232,
-                        2.71225, 2.49879, 2.34226, 2.22198, 2.12628,
-                        2.04807, 1.98276, 1.92728, 1.87946, 1.83774,
-                        1.80096, 1.76826, 1.73895, 1.7125, 1.68849,
-                        1.66657, 1.64647, 1.62795, 1.61083, 1.59494,
-                        1.58014, 1.56632, 1.55338, 1.54123, 1.5298,
-                        1.51901, 1.50881, 1.49916, 1.49, 1.4813,
-                        1.47302, 1.46512, 1.45759, 1.45039, 1.4435,
-                        1.4369, 1.43056, 1.42448, 1.41864, 1.41302,
-                        1.40761, 1.40239, 1.39736, 1.3925, 1.38781,
-                        1.38327, 1.37888, 1.37463, 1.37051, 1.36652,
-                        1.36265, 1.35889, 1.35524, 1.3517, 1.34825,
-                        1.3449, 1.34164, 1.33847, 1.33538, 1.33236,
-                        1.32943, 1.32656, 1.32377, 1.32104, 1.31838,
-                        1.31578, 1.31325, 1.31076, 1.30834, 1.30596,
-                        1.30364, 1.30137, 1.29915, 1.29697, 1.29484,
-                        1.29275, 1.29071, 1.2887, 1.28673, 1.2848,
-                        1.28291, 1.28106, 1.27923, 1.27745, 1.27569,
-                        1.27397, 1.27227, 1.27061, 1.26898, 1.26737,
-                        1.26579, 1.26424, 1.26271, 1.26121,
-                        1.25973])
+ 
+
+        maxtemp = Tmax
+        numchain = ntemps
+        b = []
+        b.append(maxtemp)
+        last = maxtemp
+        for i in range(maxtemp):
+            last = last * (numchain ** (-1 / (numchain - 1)))
+            b.append(last)
+        tstep = np.array(b)
+
         if ndim > tstep.shape[0]:
             # An approximation to the temperature step at large
             # dimension
-            tstep = 1.0 + 2.0*np.sqrt(np.log(4.0))/np.sqrt(ndim)
+            tstep = 1.0 + 2.0 * np.sqrt(np.log(4.0)) / np.sqrt(ndim)
         else:
-            tstep = tstep[ndim-1]
+            tstep = tstep[ndim - 1]
+
         appendInf = False
         if Tmax == np.inf:
             appendInf = True
             Tmax = None
             ntemps = ntemps - 1
+
         if ntemps is not None:
             if Tmax is None:
                 # Determine Tmax from ntemps.
@@ -102,35 +90,36 @@ class ParallelTempering:
         else:
             if Tmax is None:
                 raise ValueError('Must specify at least one of ``ntemps'' and '
-                                'finite ``Tmax``.')
+                                 'finite ``Tmax``.')
+
             # Determine ntemps from Tmax.
             ntemps = int(np.log(Tmax) / np.log(tstep) + 2)
+
         betas = np.logspace(0, -np.log10(Tmax), ntemps)
         if appendInf:
             # Use a geometric spacing, but replace the top-most temperature with
             # infinity.
             betas = np.concatenate((betas, [0]))
+
         return betas
+
+ 
     def assign_temperatures(self):
-        # #Linear Spacing
-        # temp = 2
-        # for i in range(0,self.num_chains):
-        # 	self.temperatures.append(temp)
-        # 	temp += 2.5 #(self.maxtemp/self.num_chains)
-        # 	print (self.temperatures[i])
-        #Geometric Spacing
+        
+        
         if self.geometric == True:
             betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.maxtemp)
             for i in range(0, self.num_chains):
-                self.temperatures.append(np.inf if betas[i] == 0 else 1.0/betas[i])
-                #print (self.temperatures[i])
+                self.temperatures.append(np.inf if betas[i] is 0 else 1.0 / betas[i])
+                print(self.temperatures[i])
         else:
-            tmpr_rate = (self.maxtemp /self.num_chains)
+
+            tmpr_rate = (self.maxtemp / self.num_chains)
             temp = 1
             for i in range(0, self.num_chains):
                 self.temperatures.append(temp)
                 temp += tmpr_rate
-                #print(self.temperatures[i])
+                print(self.temperatures[i])
     def initialize_chains(self,  burn_in):
         self.burn_in = burn_in
         self.assign_temperatures()
@@ -149,78 +138,7 @@ class ParallelTempering:
                                          self.event[i],self.rnn_net, self.optimizer))
             print(f'chain {i} initiated')
 
-    # def swap_procedure(self, parameter_queue_1, parameter_queue_2):
-    #     param1 = parameter_queue_1.get()
-    #     param2 = parameter_queue_2.get()
-    #     w1 = param1[0:self.num_param]
-    #     eta1 = param1[self.num_param]
-    #     lhood1 = param1[self.num_param+1]
-    #     T1 = param1[self.num_param+2]
-    #     w2 = param2[0:self.num_param]
-    #     eta2 = param2[self.num_param]
-    #     lhood2 = param2[self.num_param+1]
-    #     T2 = param2[self.num_param+2]
-    #     #print('yo')
-    #     #SWAPPING PROBABILITIES
-    #     try:
-    #         swap_proposal =  min(1,0.5*np.exp(lhood2 - lhood1))
-    #     except:
-    #         swap_proposal = 1
-    #     u = np.random.uniform(0,1)
-    #     if u < swap_proposal:
-    #         swapped = True
-    #         self.total_swap_proposals += 1
-    #         self.num_swap += 1
-    #         param_temp = param1
-    #         param1 = param2
-    #         param2 = param_temp
-    #     else:
-    #         swapped = False
-    #         self.total_swap_proposals+=1
-    #     return param1, param2, swapped
-    """def rmse(self, pred, actual):
-        if len(actual.shape)>2: actual = np.squeeze(actual)
-        if len(pred.shape) > 2: pred = np.squeeze(pred)
-        return np.sqrt(((pred-actual)**2).mean())
-
-    def step_wise_rmse(self, pred, actual):
-        ans = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
-        
-        print("shape of step_wise_rmse: ",ans.shape)
-        return ans"""
-    
-    # def likelihood_func(self, rnn,x,y, w, tau_sq, temp= None):
-    #     if temp is None:
-    #         temp = self.adapttemp
-
-    #     fx = rnn.evaluate_proposal(x,w)
-    #     rmse = self.rmse(fx, y)
-    #     loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.square(y-fx)/tau_sq)
-    #     return [np.sum(loss)/temp, fx, rmse]
-
-    """
-    def likelihood_func(self, rnn,x,y, w, tau_sq, temp= None):
-        if temp is None:
-            temp = self.adapttemp
-
-        fx = rnn.evaluate_proposal(x,w)
-        rmse = self.rmse(fx, y)
-        # step_wise_rmse = self.step_wise_rmse(fx,y)
-    
-        
-        '''August 16'''
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)     #trial 1
-        print("Shapes before loss: ", y.shape)
-        s = y.shape[0]
-        loss = 0
-        for i in range(s):
-            loss += np.sum(-0.5*np.log(2*math.pi*tau_sq)) -  0.5*np.sum(np.square(y[i]-fx[i])/tau_sq)
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq)) - 0.5*np.sum(np.square(y-fx)/tau_sq) 
-        print("Likelihood: ",np.sum(loss)/temp)
-        # np.sum reduces the vector into a single value11
-        #the likelihood function returns the sum of rmse values for all 10 steps. 
-        return [np.sum(loss)/temp, fx, rmse]
-    """
+ 
     rmse = ptReplica.rmse
     step_wise_rmse = ptReplica.step_wise_rmse
     likelihood_func = ptReplica.likelihood_func
@@ -250,17 +168,22 @@ class ParallelTempering:
         #Swapping Probabilities
         y_train = np.squeeze(self.train_y, axis = -1)
         
-        lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w1, tau_sq_1_vec, temp = T1)
-        lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w2, tau_sq_2_vec, temp = T2)
+        #lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w1, tau_sq_1_vec, temp = T1)
+        #lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w2, tau_sq_2_vec, temp = T2)
+
+        #lhood12 = 0
+        #lhood21 = 0
 
 
         try:
-            swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))
-            print('Swap Proposal: ',swap_proposal)
+
+            swap_proposal = min(1, 0.5 * np.exp(min(709, lhood2 - lhood1)))
+            #swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))
+            #print('Swap Proposal: ',swap_proposal)
         except OverflowError as e:
-            print(f'lhood12: {lhood12}, lhood1: {lhood1}, lhood21: {lhood21}, lhood2: {lhood2}')
+            #print(f'lhood12: {lhood12}, lhood1: {lhood1}, lhood21: {lhood21}, lhood2: {lhood2}')
             # print("swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))")
-            print(e)
+            #print(e)
             swap_proposal = 1
         u = np.random.uniform(0,1)
         if u < swap_proposal:
@@ -269,10 +192,11 @@ class ParallelTempering:
             param_temp = param1
             param1 = param2
             param2 = param_temp
-            param1[self.num_param + 1] = lhood21
-            param2[self.num_param + 1] = lhood12
-            param1[self.num_param + 2] = T2
-            param2[self.num_param + 2] = T1
+            print( lhood2,lhood1, ' have been swapped   **** **** *** ')
+            #param1[self.num_param + 1] = lhood21
+            #param2[self.num_param + 1] = lhood12
+            #param1[self.num_param + 2] = T2
+            #param2[self.num_param + 2] = T1
 
         else:
             swapped = False
@@ -318,22 +242,19 @@ class ParallelTempering:
                     self.wait_chain[index].set()
                     print(str(self.chains[index].temperature) +" Dead"+str(index))
             if count == self.num_chains:
-                break
-            #if count == 0:
-            #break
-            print(count,' is count')
-            print(datetime.datetime.now())
+                break 
+            
             timeout_count = 0
             for index in range(0,self.num_chains):
-                print("Waiting for chain: {}".format(index+1))
+                #print("Waiting for chain: {}".format(index+1))
                 flag = self.wait_chain[index].wait()
                 if flag:
-                    print("Signal from chain: {}".format(index+1))
+                    #print("Signal from chain: {}".format(index+1))
                     timeout_count += 1
             if timeout_count != self.num_chains:
-                print("Skipping the swap!")
+                #print("Skipping the swap!")
                 continue
-            print("Event occured")
+            #print("Event occured")
             for index in range(0,self.num_chains-1):
                 param_1, param_2, swapped = self.swap_procedure(self.parameter_queue[index],self.parameter_queue[index+1])
                 self.parameter_queue[index].put(param_1)

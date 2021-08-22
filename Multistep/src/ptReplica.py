@@ -44,25 +44,12 @@ class ptReplica(multiprocessing.Process):
         self.learn_rate = learn_rate
         self.l_prob = langevin_prob  # can be evaluated for diff problems - if data too large keep this low value since the gradients cost comp time
     def rmse(self, pred, actual):
-        if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
-        if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
-        step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
-        old_rmse = np.sqrt(((pred-actual)**2).mean())
-        print(f"old rmse in code: {old_rmse}")
-        new_rmse = np.mean(step_wise_rmse)
-        print(f'new rmse : {new_rmse}')
-        return new_rmse
+        return np.sqrt(((pred-actual)**2).mean())
 
     def step_wise_rmse(self, pred, actual):
-        if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
-        if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
-        ans = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
-        
-        # print("shape of step_wise_rmse: ",ans.shape)
-        return ans
+        return np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
 
-
-    '''def likelihood_func(self, fnn, data, w):
+    '''def likelihood_classification(self, fnn, data, w):
         y = data[:, self.topology[0]]
         fx  = fnn.evaluate_proposal(data,w)
         rmse = self.rmse(fx,y)
@@ -74,85 +61,43 @@ class ptReplica(multiprocessing.Process):
                     z[i,j] = 1
                 lhood += z[i,j]*np.log(prob[i,j])
         return [lhood/self.temperature, fx, rmse]'''
-    def likelihood_func(self, rnn,x,y, w, tau_sq, temp= None):
-        if temp is None:
-            temp = self.adapttemp
 
+
+    def likelihood_func(self, rnn,x,y, w, tau_sq, temp):
+ 
         fx = rnn.evaluate_proposal(x,w)
+ 
         rmse = self.rmse(fx, y)
-        step_wise_rmse = self.step_wise_rmse(fx,y)
-    
-        """experiment 0"""
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)  #(debugged)    
+        step_wise_rmse = self.step_wise_rmse(fx,y) 
+ 
 
-        """experiment 1"""
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/(tau_sq * y.shape[1]))   #tau_sq(scalar) multiplied by 10
-        
-        """experiment 2 (aug 9 unfinished) """
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)   # tau_sq(vector) different values for different steps
+        n = y.shape[0] * y.shape[1]
 
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.square(y-fx)/tau_sq) #(bug in multistep) this gives positive values for log likelihood
-        #hw do exp 1 and exp 2 on sunspot for 10000 samples
-        
-        """August 16"""
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)     #trial 1
-        # print("Shapes before loss: ", y.shape) # [num_samples, 10]
-        # s = y.shape[0]
-        # loss = 0
+        p1 = -n/2*np.log(2*math.pi*tau_sq) 
 
-        # y = shape 385,10
-        # y[i] shape (10,)
-        # y[i] - fx[i] ===> (10,)
-        # square (10,)
+        p2 = (1/2*tau_sq)
 
-        # for i in range(s):
-        #     loss += np.sum(-0.5*np.log(2*math.pi*tau_sq)) -  (1/(2*tau_sq))*np.sum(np.square(y[i]-fx[i]))
-        '''
-        #code finalised on meeting 16th august
-        loss = np.sum(-0.5*np.log(2*math.pi*tau_sq)) - (1/(2*tau_sq))*np.sum(np.square(y-fx), axis = 0) 
-        loss = loss[0]
-        '''
-        # print(f"Loss Function as on meeting gives: {np.sum(loss)}")
-        # print("Likelihood: ",np.sum(loss)/temp)
-        # np.sum reduces the vector into a single value11
+        log_lhood = p1 - p2 * np.sum(np.square(y -fx)) 
+ 
+
+        pseudo_loglhood =  log_lhood/temp
+
+        #print(pseudo_loglhood, rmse, '  **              ** ')
+
+
         #the likelihood function returns the sum of rmse values for all 10 steps. 
-
-        # debug using for loop and - not needed; using axis = 0 gives the required response
-        # use the first value from the 10 likelihoods produced -
-        # use the sum of 10 different likelihoods produced - being used till yet
-        # check the likelihood func from the langevin paper - done
-        """August 19"""
-        #extracting 10 different likelihoods for 10 steps each and taking the sum of all losses
-        #function exacted exactly as it is from paper
-        '''
-        N = y.shape[0]
-        loss = (-N/2)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq)
-        print(2*math.pi*tau_sq)
-        loss_0 = loss[0]
-        print(f'Loss function in my experiment: {np.sum(loss)}')
-        print(f'if I remove N from loss functin: {np.sum((-1/2)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq))}')
-        '''
-        
-        #Removing N from the function changes likelihood from positive to always negative.
-        #The code that was being followed till yet had the same removal of N
-        loss = (-0.5)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq)
-        loss_0 = loss[0]
-        
-        # return [np.sum(loss)/temp, fx, rmse, step_wise_rmse]
-        return [loss_0/temp, fx, rmse, step_wise_rmse]
+        return [pseudo_loglhood, fx, rmse, step_wise_rmse]
 
 
-    '''def prior_likelihood(self, sigma_squared, nu_1, nu_2, w):
-        h = self.topology[1]  # number hidden neurons
-        d = self.topology[0]  # number input neurons
+
+
+    '''def prior_likelihood(self, sigma_squared, nu_1, nu_2, w): 
         part1 = -1 * ((d * h + h + self.topology[2]+h*self.topology[2]) / 2) * np.log(sigma_squared)
         part2 = 1 / (2 * sigma_squared) * (sum(np.square(w)))
         log_loss = part1 - part2
         return log_loss'''
+    def prior_likelihood(self, sigma_squared, nu_1, nu_2, w, tausq,rnn): 
 
-    def prior_likelihood(self, sigma_squared, nu_1, nu_2, w,  tausq,rnn):  #leave this tausq as it is
-        h = self.topology[1]  # number hidden neurons
-        d = self.topology[0]  # number input neurons
         part1 = -1 * ((len(rnn.getparameters(w))) / 2) * np.log(sigma_squared)
         part2 = 1 / (2 * sigma_squared) * (sum(np.square(rnn.getparameters(w))))
         log_loss = part1 - part2  - (1 + nu_1) * np.log(tausq) - (nu_2 / tausq)
@@ -162,8 +107,7 @@ class ptReplica(multiprocessing.Process):
         samples = self.samples
         x_test = self.test_x
         x_train = self.train_x
-        y_train = np.squeeze(self.train_y, axis = -1)
-        y_test = np.squeeze(self.test_y, axis = -1)
+        y_train = self.train_y
         batch_save = 10  # batch to append to file
         learn_rate = self.learn_rate
         rnn = self.rnn#Model(self.topology,learn_rate,rnn_net = self.rnn_net)
@@ -182,45 +126,26 @@ class ptReplica(multiprocessing.Process):
         step_eta = 0.2
         #Declare RNN
         pred_train  = rnn.evaluate_proposal(x_train,w) #
-        pred_test  = rnn.evaluate_proposal(x_test, w) #
-        
-        
-        # eta = np.log(np.var(pred_train - np.array(y_train)))
-        # tau_pro = np.exp(eta)
-
-
-        # eta = np.log(np.var(pred_train - np.array(y_train) , axis = 0, keepdims= True )) # [1,10,1]
-        # tau_pro = np.exp(eta)
-        # tau_pro = np.squeeze(tau_pro)[0]
-        """experiment under consideration"""
-        # print("Shape of pred train: ", pred_train.shape)
-        # print("Shape of y_train: ", y_train.shape)
-        eta_vec = np.log(np.var(pred_train - np.array(y_train) , axis = 0, keepdims= False )) # [1,10,1]
-        # print(eta_vec.shape)
-        # print("ETA_VEC: ", eta_vec )
-        
-        
-        eta = eta_vec[0]
-        #tau_pro to be used in prior func
+        #pred_test  = rnn.evaluate_proposal(x_test, w) #
+        eta = np.log(np.var(pred_train - np.array(y_train)))
         tau_pro = np.exp(eta)
-
-        #make another tau_pro_vec to be used in likelihood func
-        tau_pro_vec = np.exp(eta_vec)
-
         sigma_squared = 25
         nu_1 = 0
         nu_2 = 0
         sigma_diagmat = np.zeros((w_size, w_size))  # for Equation 9 in Ref [Chandra_ICONIP2017]
         np.fill_diagonal(sigma_diagmat, step_w**2)
         #delta_likelihood = 0.5 # an arbitrary position
-        prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro, rnn)  # takes care of the gradients
-        # print("prior current shape ", prior_current)
-        [likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w, tau_pro_vec, temp= self.temperature)
-        [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w, tau_pro_vec, temp= self.temperature)
+        prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro,rnn)  # takes care of the gradients
+        [likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro,  self.temperature)
+
+        likelihood = likelihood/self.adapttemp
+
+        print(likelihood, rmsetrain, ' is initial lhood * * *')
+        #[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro,   self.temperature)
         prop_list = np.zeros((samples,w_size))
         likeh_list = np.zeros((samples,2)) # one for posterior of likelihood and the other for all proposed likelihood
         likeh_list[0,:] = [-100, -100] # to avoid prob in calc of 5th and 95th percentile later
-        surg_likeh_list = np.zeros((samples,2))
+        #surg_likeh_list = np.zeros((samples,2))
         accept_list = np.zeros(samples)
         num_accepted = 0
         langevin_count = 0
@@ -234,8 +159,8 @@ class ptReplica(multiprocessing.Process):
                 self.adapttemp =  self.temperature #* ratio  #
             if i == pt_samples and init_count ==0: # move to MCMC canonical
                 self.adapttemp = 1
-                [likelihood, pred_train, rmsetrain, step_wise_rmsetrain ] = self.likelihood_func(rnn, self.train_x, y_train, w, tau_pro, temp= self.adapttemp)
-                [_, pred_test, rmsetest, step_wise_rmsetest ] = self.likelihood_func(rnn, self.test_x, y_test, w, tau_pro, temp= self.adapttemp)
+                [likelihood, pred_train, rmsetrain, step_wise_rmsetrain ] = self.likelihood_func(rnn, self.train_x,self.train_y, w, tau_pro,   self.adapttemp)
+                [_, pred_test, rmsetest, step_wise_rmsetest ] = self.likelihood_func(rnn, self.test_x,self.test_y, w, tau_pro,   self.adapttemp)
                 init_count = 1
             lx = np.random.uniform(0,1,1)
             if (self.use_langevin_gradients is True) and (lx< self.l_prob):
@@ -255,35 +180,28 @@ class ptReplica(multiprocessing.Process):
             else:
                 diff_prop = 0
                 w_proposal = rnn.addnoiseandcopy(w,0,step_w) #np.random.normal(w, step_w, w_size)
-            eta_pro_vec = eta_vec + np.random.normal(0, step_eta, 1)
-            eta_pro = eta_pro_vec[0]
-            # print('eta ki dusri baar me shape: ', eta_pro.shape)
-            tau_pro_vec = np.exp(eta_pro_vec)
-            tau_pro = np.exp(eta_pro)
-            # print("TAU_PRO during training: ", tau_pro)
-            # tau_pro = np.squeeze(tau_pro)[0]
-            # print("tau pro ki baad me shape: ", tau_pro.shape)
-            [likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w_proposal,tau_pro_vec, temp= self.adapttemp)
-            [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w_proposal,tau_pro_vec, temp= self.adapttemp)
+            eta_pro = eta + np.random.normal(0, step_eta, 1)
+            tau_pro = math.exp(eta_pro)
+            [likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x,self.train_y, w_proposal,tau_pro,  self.adapttemp)
+            [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x,self.test_y, w_proposal,tau_pro,  self.adapttemp)
             # print(step_wise_rmsetest.shape,"shape of step wise rmse")
             prior_prop = self.prior_likelihood(sigma_squared, nu_1, nu_2, w_proposal,tau_pro,rnn)  # takes care of the gradients
-            # print("prior proposal ", prior_prop)
             diff_prior = prior_prop - prior_current
             diff_likelihood = likelihood_proposal - likelihood
-            surg_likeh_list[i+1,0] = likelihood_proposal * self.adapttemp
+            #surg_likeh_list[i+1,0] = likelihood_proposal * self.adapttemp
             #surg_likeh_list[i+1,1] = np.nan
             try:
-                # mh_prob = min(0, (diff_likelihood + diff_prior + diff_prop))
-               
-                mh_prob = diff_likelihood + diff_prior + diff_prop   #https://github.com/sydney-machine-learning/BayesianAutoencoders/blob/239a2ab9e81fc6b95cb60303303377b0dac37b7c/Bayesian/Parallel_Tempering_Tabular.py#L519
-                # mh_prob = min(1, np.exp(diff_likelihood+ diff_prior + diff_prop , dtype = np.float128)) #as given in paper
+                mh_prob = min(0, (diff_likelihood + diff_prior + diff_prop))
+                #mh_prob = diff_likelihood + diff_prior + diff_prop   #https://github.com/sydney-machine-learning/BayesianAutoencoders/blob/239a2ab9e81fc6b95cb60303303377b0dac37b7c/Bayesian/Parallel_Tempering_Tabular.py#L519
+                # mh_prob = min(1, math.exp(diff_likelihood+ diff_prior + diff_prop , dtype = np.float128)) #as given in paper
+                # mh_prob = math.exp(mh_prob)
             except OverflowError as e:
                 mh_prob = 1
             accept_list[i+1] = num_accepted
             if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
                 x = 0
-            u = np.log(random.uniform(0, 1))
-            # u = random.uniform(0,1)
+            #u = np.log(random.uniform(0, 1))
+            u = random.uniform(0,1)
 
             prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
             likeh_list[i+1,0] = likelihood_proposal
@@ -292,27 +210,29 @@ class ptReplica(multiprocessing.Process):
                 likelihood = likelihood_proposal
                 prior_current = prior_prop
                 w = copy.deepcopy(w_proposal)
-                eta_vec = eta_pro_vec
+                eta = eta_pro
                 # acc_train[i+1,] = 0
                 # acc_test[i+1,] = 0
-                print(i,'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' accepted')
+                print(i, num_accepted, langevin_count, 'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' accepted', likelihood_proposal, prior_current )
                 pos_w[i+ 1,] = rnn.getparameters(w_proposal).reshape(-1)
                 rmse_train[i + 1,] = rmsetrain
-                step_wise_rmse_train[i+1,] = step_wise_rmsetrain
+                step_wise_rmse_train[i+1,] = np.squeeze(step_wise_rmsetrain, axis = -1)
                 rmse_test[i + 1,] = rmsetest
-                step_wise_rmse_test[i+1,] = step_wise_rmsetest          
+                step_wise_rmse_test[i+1,] = np.squeeze(step_wise_rmsetest, axis = -1)
             else:
                 pos_w[i+1,] = pos_w[i,]
                 rmse_train[i + 1,] = rmse_train[i,]
                 step_wise_rmse_train[i+1,] = step_wise_rmse_train[i,]
                 rmse_test[i + 1,] = rmse_test[i,]
                 step_wise_rmse_test[i+1,] = step_wise_rmse_test[i,]
+
+                print(i, num_accepted, langevin_count, 'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' REJECT ', likelihood_proposal, prior_current )
                 # acc_train[i+1,] = acc_train[i,]
                 # acc_test[i+1,] = acc_test[i,]
             if ((i+1) % self.swap_interval == 0 and i != 0 ):
                 print(str(i)+'th sample running')
                 w_size = rnn.getparameters(w).reshape(-1).shape[0]
-                param = np.concatenate([rnn.getparameters(w).reshape(-1), eta_vec, np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
+                param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
                 self.signal_main.set()
                 self.event.clear()
@@ -328,18 +248,13 @@ class ptReplica(multiprocessing.Process):
                 eta = param1[w_size]
                 w1_dict = rnn.dictfromlist(w1)
                 rnn.loadparameters(w1_dict)
-
-
         # print(f'length of step_wise rmse before burnin: {step_wise_rmse_train.shape}, {step_wise_rmse_test.shape}')
-        param = np.concatenate([rnn.getparameters(w).reshape(-1), eta_vec, np.asarray([likelihood]),np.asarray([self.adapttemp]),np.asarray([i])]) #eta_vec.reshape(1)
-        
-        # print("THIS IS THE PARAMETER QUEUE: ", param)
-        # print("SHAPE OF PARAMETER QUUEU:" , param.shape)
+        param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood]),np.asarray([self.adapttemp]),np.asarray([i])])
         self.parameter_queue.put(param)
         self.signal_main.set()
-        print ((num_accepted*100 / (samples * 1.0)), f'% \samples out of {samples} were accepted')
+        print (num_accepted, (num_accepted*100 / (samples * 1.0)), f'% samples out of {samples} were accepted')
         accept_ratio = num_accepted / (samples * 1.0) * 100
-        print ((langevin_count*100 / (samples * 1.0)), '% \of total samples were Langevin')
+        print (langevin_count, (langevin_count*100 / (samples * 1.0)), '% of total samples were Langevin')
         langevin_ratio = langevin_count / (samples * 1.0) * 100
         file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperature)+ '.txt'
         np.savetxt(file_name,pos_w )

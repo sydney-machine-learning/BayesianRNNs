@@ -23,7 +23,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=2000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -31,9 +31,8 @@ parser.add_argument('-b','--burn', help='How many samples to discard before dete
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.025,type=float)
 parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.01,type=float)
-parser.add_argument('-m','--model', help='1 to select RNN, 2 to select LSTM', dest = "net", default = 1, type= int)
-parser.add_argument('-o','--optim', help='1 to select SGD, 2 to select Adam', dest = 'optimizer', default = 1, type = int)
-parser.add_argument('-debug','--debug', help='debug = 0 or 1; when 1 trace plots will not be produced', dest= 'DEBUG', default= 1, type= bool)
+parser.add_argument('-m','--model', help='1 to select RNN, 2 to select LSTM', dest = "net", default = 2, type= int)
+parser.add_argument('-o','--optim', help='1 to select SGD, 2 to select Adam', dest = 'optimizer', default = 2, type = int)
 args = parser.parse_args()
 
 
@@ -118,11 +117,12 @@ def main():
     n_steps_in, n_steps_out = 5,10
     net = 'RNN' if args.net == 1 else 'LSTM' 
     optimizer = 'SGD' if args.optimizer == 1 else 'Adam'
+
     print(f"Network is {net} and optimizer is {optimizer}")
     print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
     
-    for j in [1,2,3,6] :
+    for j in [2, 3, 5, 6] :
         print(j, ' out of 15','\n\n\n')
         #i = j//2
         problem=j
@@ -225,7 +225,7 @@ def main():
         # resultingfile = open( path+'/master_result_file.txt','a+')
         # resultingfile_db = open( path_db+'/master_result_file.txt','a+')
         timer = time.time()
-        langevin_prob = 0.9
+        langevin_prob = 0.5
         pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, 
                                 swap_interval, langevin_prob, path,rnn_net = net, optimizer= optimizer)
         directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
@@ -253,18 +253,15 @@ def main():
         print(pos_w.shape, ' is shape of pos w \nInitiating Plotting Sequence')
         plot_fname = path
         # pt.make_directory(plot_fname + '/pos_plots')
-        
-        if args.DEBUG == 0:        
-            for s in range(pos_w.shape[0]): # change this if you want to see all pos plots
-                plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
-            print(' images placed in folder with name: ',path)
+        for s in range(20): # change this if you want to see all pos plots
+            plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
+        print(' images placed in folder with name: ',path)
 
-            if not os.path.exists(path+ '/trace_plots_better'):
-                os.makedirs(path+ '/trace_plots_better')
-            for i in range(pos_w.shape[0]):
-                histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
-
-
+        if not os.path.exists(path+ '/trace_plots_better'):
+            os.makedirs(path+ '/trace_plots_better')
+        #for i in range(pos_w.shape[0]):
+        for i in range(20):
+            histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
 
         #Plot to compare the rmse accross all the chains
         font = 12
