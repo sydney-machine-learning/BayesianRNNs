@@ -1,9 +1,5 @@
-Res_LG-Lprob_RNN/
-Res_LG-Lprob_LSTM/
-Multistep/src/__pycache__/
-.git
 .vscode
 __pycache__
 working.code-workspace
-Multistep/src/Res_LG-Lprob_LSTM_Adam_10chains/
-Multistep/src/Res_LG-Lprob_RNN_SGD_10chains/
+
+
