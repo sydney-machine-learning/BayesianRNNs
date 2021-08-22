@@ -7,7 +7,8 @@ import numpy as np
 import math
 import random
 import time
-import torch
+import torch 
+ 
 
 class ptReplica(multiprocessing.Process):
     def __init__(self, use_langevin_gradients, learn_rate,  w,  minlim_param, maxlim_param, samples,trainx,trainy,testx,testy, topology, burn_in, temperature, swap_interval, langevin_prob, path, parameter_queue, main_process,event,rnn_net, optimizer):
@@ -69,26 +70,18 @@ class ptReplica(multiprocessing.Process):
  
         rmse = self.rmse(fx, y)
         step_wise_rmse = self.step_wise_rmse(fx,y) 
- 
 
         n = y.shape[0] * y.shape[1]
 
-        p1 = -n/2*np.log(2*math.pi*tau_sq) 
+        p1 = -(n/2)*np.log(2*math.pi*tau_sq) 
 
-        p2 = (1/2*tau_sq)
+        p2 = (1/(2*tau_sq)) 
 
-        log_lhood = p1 - p2 * np.sum(np.square(y -fx)) 
- 
+        log_lhood = p1 -  (p2 * np.sum(np.square(y -fx)) )
 
         pseudo_loglhood =  log_lhood/temp
-
-        #print(pseudo_loglhood, rmse, '  **              ** ')
-
-
-        #the likelihood function returns the sum of rmse values for all 10 steps. 
+ 
         return [pseudo_loglhood, fx, rmse, step_wise_rmse]
-
-
 
 
     '''def prior_likelihood(self, sigma_squared, nu_1, nu_2, w): 
@@ -206,7 +199,7 @@ class ptReplica(multiprocessing.Process):
             if u < mh_prob:
                 num_accepted  =  num_accepted + 1
                 likelihood = likelihood_proposal
-                prior_current = prior_prop
+                prior_current = prior_prop 
                 w = copy.deepcopy(w_proposal)
                 eta = eta_pro
                 # acc_train[i+1,] = 0
@@ -224,11 +217,10 @@ class ptReplica(multiprocessing.Process):
                 rmse_test[i + 1,] = rmse_test[i,]
                 step_wise_rmse_test[i+1,] = step_wise_rmse_test[i,]
 
-                print(i, num_accepted, langevin_count, 'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' REJECT ', likelihood_proposal, prior_current )
+                #print(i, num_accepted, langevin_count, 'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' REJECT ', likelihood_proposal, prior_current )
                 # acc_train[i+1,] = acc_train[i,]
                 # acc_test[i+1,] = acc_test[i,]
-            if ((i+1) % self.swap_interval == 0 and i != 0 ):
-                print(str(i)+'th sample running')
+            if ((i+1) % self.swap_interval == 0 and i != 0 ): 
                 w_size = rnn.getparameters(w).reshape(-1).shape[0]
                 param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)

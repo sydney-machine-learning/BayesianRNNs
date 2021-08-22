@@ -163,14 +163,14 @@ class ParallelTempering:
         eta2_vec = param2[self.num_param: self.num_param + 10]
 
 
-        tau_sq_2_vec = np.exp(eta2_vec)
+        #tau_sq_2_vec = np.exp(eta2_vec)
         # lhood2 = param2[self.num_param + 10 + 0 ]
         lhood2 = param2[-2]
         # T2 = param2[self.num_param + 10 + 1]
         T2 = param2[-1]
 
         #Swapping Probabilities
-        y_train = np.squeeze(self.train_y, axis = -1)
+        #y_train = np.squeeze(self.train_y, axis = -1)
         
         #lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w1, tau_sq_1_vec, temp = T1)
         #lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w2, tau_sq_2_vec, temp = T2)

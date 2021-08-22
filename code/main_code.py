@@ -17,6 +17,9 @@ import matplotlib as mpl
 import pandas as pd
 from model import Model
 from parallelTempering import ParallelTempering
+import shutil 
+
+import os 
 
 
 mpl.use('agg')
@@ -119,12 +122,10 @@ def main():
     optimizer = 'SGD' if args.optimizer == 1 else 'Adam'
 
     print(f"Network is {net} and optimizer is {optimizer}")
-    print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
-
+    
     
     for j in [1, 2, 3, 5, 6] :
-        print(j, ' out of 15','\n\n\n')
-        #i = j//2
+        print(j, ' is problem','\n\n\n') 
         problem=j
         folder = ".."
         if problem ==1:
@@ -206,15 +207,15 @@ def main():
         #   langevn = "F"
         #   pass # we dont want to execute this.
         print(f'langevin is {use_langevin_gradients}')
-        problemfolder = os.getcwd()+'/Result-summary_'+net+f'_{optimizer}/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
-        problemfolder_db = 'Result-all_'+net+ f'_{optimizer}/'  # save main results
+        problemfolder = os.getcwd()+'/Result-all_'+net+f'_{optimizer}/'  #'/home/rohit/Desktop/PT/Res_LG-Lprob/'  # change this to your directory for results output - produces large datasets
+        problemfolder_db = 'Result-summ_'+net+ f'_{optimizer}/'  # save main results
         filename = ""
         run_nb = 0
         while os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
             run_nb += 1
         if not os.path.exists( problemfolder+name+langevn+'_%s' % (run_nb)):
             os.makedirs(  problemfolder+name+langevn+'_%s' % (run_nb))
-            path = (problemfolder+ name+langevn+'_%s' % (run_nb))
+            pathx = (problemfolder+ name+langevn+'_%s' % (run_nb))
         filename = ""
         run_nb = 0
         while os.path.exists( problemfolder_db+name+langevn+'_%s' % (run_nb)):
@@ -225,13 +226,17 @@ def main():
         # resultingfile = open( path+'/master_result_file.txt','a+')
         # resultingfile_db = open( path_db+'/master_result_file.txt','a+')
         timer = time.time()
+
+        
         langevin_prob = 0.5
+
+
         pt = ParallelTempering( use_langevin_gradients,  learn_rate,  train_x,train_y,test_x,test_y, topology, num_chains, maxtemp, NumSample, 
-                                swap_interval, langevin_prob, path,rnn_net = net, optimizer= optimizer)
-        directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
+                                swap_interval, langevin_prob, pathx,rnn_net = net, optimizer= optimizer)
+        directories = [  pathx+'/predictions/', pathx+'/posterior', pathx+'/results', #path+'/surrogate', 
                             # path+'/surrogate/learnsurrogate_data', 
-                            path+'/posterior/pos_w',  path+'/posterior/pos_likelihood',
-                            path+'/posterior/accept_list'  ] #path+'/posterior/surg_likelihood',
+                            pathx+'/posterior/pos_w',  pathx+'/posterior/pos_likelihood',
+                            pathx+'/posterior/accept_list'  ] #path+'/posterior/surg_likelihood',
         for d in directories:
             pt.make_directory((filename)+ d)
         pt.initialize_chains(burn_in)
@@ -251,19 +256,24 @@ def main():
         # break
 
         print(pos_w.shape, ' is shape of pos w \nInitiating Plotting Sequence')
-        plot_fname = path
+        plot_fname = pathx
         # pt.make_directory(plot_fname + '/pos_plots')
         for s in range(20): # change this if you want to see all pos plots
-            plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , path)
-        print(' images placed in folder with name: ',path)
+            plot_figure(pos_w[s,:], 'pos_distri_'+str(s) , pathx)
+        print(' images placed in folder with name: ',pathx)
 
-        if not os.path.exists(path+ '/trace_plots_better'):
-            os.makedirs(path+ '/trace_plots_better')
+        if not os.path.exists(pathx+ '/trace_plots_better'):
+            os.makedirs(pathx+ '/trace_plots_better')
         #for i in range(pos_w.shape[0]):
         for i in range(20):
-            histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
+            histogram_trace(pos_w[i,:], pathx+ '/trace_plots_better/'+ str(i))
 
         #Plot to compare the rmse accross all the chains
+
+
+        print(' begin visulisation of results')
+
+
         font = 12
         fig = plt.figure(figsize=(10,12))
         ax = fig.add_subplot(111)
@@ -303,7 +313,7 @@ def main():
         fig.tight_layout()
         fig.subplots_adjust(top=0.88)
         
-        plt.savefig(path + '/rmse_comparison.png', bbox_inches='tight', dpi=300, transparent=False)
+        plt.savefig(pathx + '/rmse_comparison.png', bbox_inches='tight', dpi=300, transparent=False)
         plt.close()
         accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
         accept_per = np.mean(accept_ratio) * 100
@@ -331,8 +341,8 @@ def main():
         rmse_tes = np.mean(rmse_test[:])
         rmsetest_std = np.std(rmse_test[:])
         rmsetes_max = np.amin(rmse_test[:])
-        outres = open(path+'/results/result.txt', "a+")
-        outres_step = open(path + '/results/result_stepwise.txt', 'a+')
+        outres = open(pathx+'/results/result.txt', "a+")
+        outres_step = open(pathx + '/results/result_stepwise.txt', 'a+')
         # outres_db = open(path_db+'/result.txt', "a+")
         # outres_step_db = open(path + '/result_stepwise.txt', 'a+')
         resultingfile = open(problemfolder+'/master_result_file.txt','a+')
@@ -360,7 +370,7 @@ def main():
         df = df.reindex(columns= columns)
         df = df.transpose()
 
-        df.to_csv(path_or_buf= path + '/results/result_stepwise.csv', header = f'{net} {optimizer}')
+        df.to_csv(path_or_buf= pathx + '/results/result_stepwise.csv', header = f'{net} {optimizer}')
 
         np.savetxt(outres_step, step_wise_results, fmt = '%1.4f', newline= ' \n')
         # np.savetxt(outres_step_db, step_wise_results, fmt= '%1.4f', newline = ' \n')
@@ -403,7 +413,7 @@ def main():
         plt.legend(loc='upper right')
         plt.xlabel('Samples', fontsize=12)
         plt.ylabel('RMSE', fontsize=12)
-        plt.savefig(path+'/rmse_samples.pdf')
+        plt.savefig(pathx+'/rmse_samples.pdf')
         plt.clf()
         likelihood = likelihood_rep[:,0] # just plot proposed likelihood
         likelihood = np.asarray(np.split(likelihood, num_chains))
@@ -411,7 +421,7 @@ def main():
         plt.plot(likelihood.T)
         plt.xlabel('Samples', fontsize=12)
         plt.ylabel(' Log-Likelihood', fontsize=12)
-        plt.savefig(path+'/likelihood.png')
+        plt.savefig(pathx+'/likelihood.png')
         plt.clf()
         plt.plot(likelihood.T)
         plt.xlabel('Samples', fontsize=12)
@@ -421,7 +431,7 @@ def main():
         plt.plot(accept_vec.T )
         plt.xlabel('Samples', fontsize=12)
         plt.ylabel(' Number accepted proposals', fontsize=12)
-        plt.savefig(path+'/accept.png')
+        plt.savefig(pathx+'/accept.png')
         plt.clf()
         plt.plot(accept_vec.T )
         plt.xlabel('Samples', fontsize=12)
@@ -442,6 +452,8 @@ def main():
 
         #plotting step_wise_rmse_values
 
+        print(' done with visulisation of results')
+
 
 
 
@@ -452,6 +464,22 @@ def main():
         resultingfile.close()
         resultingfile_db.close()
         # outres_db.close()
+
+
+        dir_name = pathx  + '/posterior'
+        print(dir_name)
+        if os.path.isdir(dir_name):
+            shutil.rmtree(dir_name)
+        
+        dir_name = pathx  + '/predictions'
+        print(dir_name)
+        if os.path.isdir(dir_name):
+            shutil.rmtree(dir_name)
+
+        #fname_remove = path_db  +'/pos_param.txt'
+
+        #if os.path.exists(fname_remove):  # comment if you wish to keep pos file
+        #    os.remove(fname_remove)
 
     
 
