@@ -26,7 +26,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -35,7 +35,7 @@ parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samp
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.025,type=float)
 parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.01,type=float)
 parser.add_argument('-m','--model', help='1 to select RNN, 2 to select LSTM', dest = "net", default = 2, type= int)
-parser.add_argument('-o','--optim', help='1 to select SGD, 2 to select Adam', dest = 'optimizer', default = 2, type = int)
+parser.add_argument('-o','--optim', help='1 to select SGD, 2 to select Adam', dest = 'optimizer', default = 1, type = int)
 args = parser.parse_args()
 
 
@@ -186,13 +186,22 @@ def main():
         ###############################
         #THESE ARE THE HYPERPARAMETERS#
         ###############################
+
+
+        
         Hidden = 10 #originally it was 5; but in the paper to compare it is 10
+
+
+
+
         topology = [n_steps_in, Hidden,n_steps_out]
         NumSample = args.samples
         netw = topology
-        maxtemp = args.mt_val
+        maxtemp = args.mt_val 
         swap_ratio = args.swap_ratio
         num_chains =  args.num_chains
+
+
         swap_interval = 5
         
         #int(swap_ratio * NumSample/num_chains)   #how ofen you swap neighbours. note if swap is more than Num_samples, its off
@@ -291,7 +300,7 @@ def main():
         ax1.legend([f'Chain {i}' for i in range(args.num_chains)])
         #this rmse train is something which is like {rmse trains of chain1, rmse trains of chain2 , ... }
 
-
+    
         color = ['blue','red', 'pink', 'green', 'purple', 'cyan', 'orange','olive', 'brown', 'black']
 
         ax1.grid(True)
