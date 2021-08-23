@@ -14,7 +14,7 @@ class Model(nn.Module):
         # assuming num_dicrections to be 1 for all the cases
         # Defining some parameters
         self.hidden_dim = topo[1]#hidden_dim
-        self.n_layers = 1#2 if rnn_net is 'RNN' else 1   #len(topo)-2 #n_layers
+        self.n_layers = 2 if rnn_net is 'RNN' else 1   #len(topo)-2 #n_layers
         self.batch_size = 1
         self.lrate = lrate
         self.optimizer = optimizer
@@ -45,10 +45,12 @@ class Model(nn.Module):
             out = self.fc(out[-1])
             out = self.sigmoid(out)
             out = out.reshape(outmain[i].shape)
+            # print(",out.shape)
             outmain[i,] = copy.deepcopy(out.detach())
-        # print("shape of outmain", outmain.shape)
+        # print("shape of outmain", np.squeeze(outmain,axis = -1).shape)
         # print("shape of x",x.shape)
-        return copy.deepcopy(outmain)
+        return copy.deepcopy(np.squeeze(outmain, axis = -1))
+
     def init_hidden(self, batch_size):
         # This method generates the first hidden state of zeros which we'll use in the forward pass
         # We'll send the tensor holding the hidden state to the device we specified earlier as well
