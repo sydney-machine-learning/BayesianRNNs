@@ -9,6 +9,7 @@ class Model(nn.Module):
         """
             rnn_net = RNN/LSTM
             optimizer = Adam/ SGD
+            topology = [input size, hidden size, output size]
         """
         super(Model, self).__init__()
         # assuming num_dicrections to be 1 for all the cases
