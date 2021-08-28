@@ -231,8 +231,8 @@ class ParallelTempering:
         param2 = parameter_queue_2.get()
         w1 = param1[0:self.num_param]
         w1 = self.rnn.dictfromlist(w1)
-        eta1_vec = param1[self.num_param:self.num_param + 10]
-        tau_sq_1_vec = np.exp(eta1_vec)
+        # eta1_vec = param1[self.num_param:self.num_param + 10]
+        # tau_sq_1_vec = np.exp(eta1_vec)
         # lhood1 = param1[self.num_param+10]
         lhood1 = param1[-2]
         # T1 = param1[self.num_param+10+1]
@@ -240,27 +240,28 @@ class ParallelTempering:
 
         w2 = param2[:self.num_param]
         w2 = self.rnn.dictfromlist(w2)
-        eta2_vec = param2[self.num_param: self.num_param + 10]
-        tau_sq_2_vec = np.exp(eta2_vec)
+        # eta2_vec = param2[self.num_param: self.num_param + 10]
+        # tau_sq_2_vec = np.exp(eta2_vec)
         # lhood2 = param2[self.num_param + 10 + 0 ]
         lhood2 = param2[-2]
         # T2 = param2[self.num_param + 10 + 1]
         T2 = param2[-1]
 
         #Swapping Probabilities
-        y_train = np.squeeze(self.train_y, axis = -1)
+        # y_train = np.squeeze(self.train_y, axis = -1)
         
-        lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w1, tau_sq_1_vec, temp = T1)
-        lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w2, tau_sq_2_vec, temp = T2)
+        # lhood12, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w1, tau_sq_1_vec, temp = T1)
+        # lhood21, dump1, dump2, dump3 = self.likelihood_func(self.rnn, self.train_x, y_train, w2, tau_sq_2_vec, temp = T2)
 
 
         try:
-            swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))
+            # swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))
+            swap_proposal = min(1, 0.5*np.exp(min(709,lhood2-lhood1)))
             print('Swap Proposal: ',swap_proposal)
         except OverflowError as e:
-            print(f'lhood12: {lhood12}, lhood1: {lhood1}, lhood21: {lhood21}, lhood2: {lhood2}')
+            # print(f'lhood12: {lhood12}, lhood1: {lhood1}, lhood21: {lhood21}, lhood2: {lhood2}')
             # print("swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))")
-            print(e)
+            # print(e)
             swap_proposal = 1
         u = np.random.uniform(0,1)
         if u < swap_proposal:
@@ -383,7 +384,7 @@ class ParallelTempering:
         for i in range(self.num_chains):
             file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperatures[i])+ '.txt'
             dat = np.loadtxt(file_name)
-            pos_w[i,:,:] = dat[burnin:,:]
+            pos_w[i,:] = dat[burnin:]
             file_name = self.path + '/posterior/pos_likelihood/'+'chain_' + str(self.temperatures[i]) + '.txt'
             dat = np.loadtxt(file_name)
             likelihood_rep[i, :] = dat[1:]

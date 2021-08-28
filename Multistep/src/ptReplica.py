@@ -62,93 +62,29 @@ class ptReplica(multiprocessing.Process):
         return ans
 
 
-    '''def likelihood_func(self, fnn, data, w):
-        y = data[:, self.topology[0]]
-        fx  = fnn.evaluate_proposal(data,w)
-        rmse = self.rmse(fx,y)
-        z = np.zeros((data.shape[0],self.topology[2]))
-        lhood = 0
-        for i in range(data.shape[0]):
-            for j in range(self.topology[2]):
-                if j == y[i]:
-                    z[i,j] = 1
-                lhood += z[i,j]*np.log(prob[i,j])
-        return [lhood/self.temperature, fx, rmse]'''
-    def likelihood_func(self, rnn,x,y, w, tau_sq, temp= None):
-        if temp is None:
-            temp = self.adapttemp
 
+
+    def likelihood_func(self, rnn,x,y, w, tau_sq, temp):
+ 
         fx = rnn.evaluate_proposal(x,w)
+ 
         rmse = self.rmse(fx, y)
-        step_wise_rmse = self.step_wise_rmse(fx,y)
-    
-        """experiment 0"""
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)  #(debugged)    
+        step_wise_rmse = self.step_wise_rmse(fx,y) 
 
-        """experiment 1"""
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/(tau_sq * y.shape[1]))   #tau_sq(scalar) multiplied by 10
-        
-        """experiment 2 (aug 9 unfinished) """
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)   # tau_sq(vector) different values for different steps
+        n = y.shape[0] * y.shape[1]
 
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.square(y-fx)/tau_sq) #(bug in multistep) this gives positive values for log likelihood
-        #hw do exp 1 and exp 2 on sunspot for 10000 samples
-        
-        """August 16"""
-        # loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5*np.sum(np.square(y-fx))/tau_sq)     #trial 1
-        # print("Shapes before loss: ", y.shape) # [num_samples, 10]
-        # s = y.shape[0]
-        # loss = 0
+        p1 = -(n/2)*np.log(2*math.pi*tau_sq) 
 
-        # y = shape 385,10
-        # y[i] shape (10,)
-        # y[i] - fx[i] ===> (10,)
-        # square (10,)
+        p2 = (1/(2*tau_sq)) 
 
-        # for i in range(s):
-        #     loss += np.sum(-0.5*np.log(2*math.pi*tau_sq)) -  (1/(2*tau_sq))*np.sum(np.square(y[i]-fx[i]))
-        '''
-        #code finalised on meeting 16th august
-        loss = np.sum(-0.5*np.log(2*math.pi*tau_sq)) - (1/(2*tau_sq))*np.sum(np.square(y-fx), axis = 0) 
-        loss = loss[0]
-        '''
-        # print(f"Loss Function as on meeting gives: {np.sum(loss)}")
-        # print("Likelihood: ",np.sum(loss)/temp)
-        # np.sum reduces the vector into a single value11
-        #the likelihood function returns the sum of rmse values for all 10 steps. 
+        log_lhood = p1 -  (p2 * np.sum(np.square(y -fx)) )
 
-        # debug using for loop and - not needed; using axis = 0 gives the required response
-        # use the first value from the 10 likelihoods produced -
-        # use the sum of 10 different likelihoods produced - being used till yet
-        # check the likelihood func from the langevin paper - done
-        """August 19"""
-        #extracting 10 different likelihoods for 10 steps each and taking the sum of all losses
-        #function exacted exactly as it is from paper
-        '''
-        N = y.shape[0]
-        loss = (-N/2)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq)
-        print(2*math.pi*tau_sq)
-        loss_0 = loss[0]
-        print(f'Loss function in my experiment: {np.sum(loss)}')
-        print(f'if I remove N from loss functin: {np.sum((-1/2)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq))}')
-        '''
-        
-        #Removing N from the function changes likelihood from positive to always negative.
-        #The code that was being followed till yet had the same removal of N
-        loss = (-0.5)*np.log(2*math.pi*tau_sq) - np.sum(np.square(y-fx), axis= 0)/(2*tau_sq)
-        loss_0 = loss[0]
-        
-        # return [np.sum(loss)/temp, fx, rmse, step_wise_rmse]
-        return [loss_0/temp, fx, rmse, step_wise_rmse]
+        pseudo_loglhood =  log_lhood/temp
+ 
+        return [pseudo_loglhood, fx, rmse, step_wise_rmse]
 
 
-    '''def prior_likelihood(self, sigma_squared, nu_1, nu_2, w):
-        h = self.topology[1]  # number hidden neurons
-        d = self.topology[0]  # number input neurons
-        part1 = -1 * ((d * h + h + self.topology[2]+h*self.topology[2]) / 2) * np.log(sigma_squared)
-        part2 = 1 / (2 * sigma_squared) * (sum(np.square(w)))
-        log_loss = part1 - part2
-        return log_loss'''
+  
 
     def prior_likelihood(self, sigma_squared, nu_1, nu_2, w,  tausq,rnn):  #leave this tausq as it is
         h = self.topology[1]  # number hidden neurons
@@ -185,9 +121,9 @@ class ptReplica(multiprocessing.Process):
         pred_test  = rnn.evaluate_proposal(x_test, w) #
         
         
-        # eta = np.log(np.var(pred_train - np.array(y_train)))
-        # tau_pro = np.exp(eta)
-
+        eta = np.log(np.var(pred_train - np.array(y_train)))
+        tau_pro = np.exp(eta)
+        print("tau_pro: ", tau_pro)
 
         # eta = np.log(np.var(pred_train - np.array(y_train) , axis = 0, keepdims= True )) # [1,10,1]
         # tau_pro = np.exp(eta)
@@ -195,17 +131,17 @@ class ptReplica(multiprocessing.Process):
         """experiment under consideration"""
         # print("Shape of pred train: ", pred_train.shape)
         # print("Shape of y_train: ", y_train.shape)
-        eta_vec = np.log(np.var(pred_train - np.array(y_train) , axis = 0, keepdims= False )) # [1,10,1]
+        # eta_vec = np.log(np.var(pred_train - np.array(y_train) , axis = 0, keepdims= False )) # [1,10,1]
         # print(eta_vec.shape)
         # print("ETA_VEC: ", eta_vec )
         
         
-        eta = eta_vec[0]
+        # eta = eta_vec[0]
         #tau_pro to be used in prior func
-        tau_pro = np.exp(eta)
+        # tau_pro = np.exp(eta)
 
         #make another tau_pro_vec to be used in likelihood func
-        tau_pro_vec = np.exp(eta_vec)
+        # tau_pro_vec = np.exp(eta_vec)
 
         sigma_squared = 25
         nu_1 = 0
@@ -215,8 +151,8 @@ class ptReplica(multiprocessing.Process):
         #delta_likelihood = 0.5 # an arbitrary position
         prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro, rnn)  # takes care of the gradients
         # print("prior current shape ", prior_current)
-        [likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w, tau_pro_vec, temp= self.temperature)
-        [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w, tau_pro_vec, temp= self.temperature)
+        [likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w, tau_pro, temp= self.temperature)
+        [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w, tau_pro, temp= self.temperature)
         prop_list = np.zeros((samples,w_size))
         likeh_list = np.zeros((samples,2)) # one for posterior of likelihood and the other for all proposed likelihood
         likeh_list[0,:] = [-100, -100] # to avoid prob in calc of 5th and 95th percentile later
@@ -255,16 +191,16 @@ class ptReplica(multiprocessing.Process):
             else:
                 diff_prop = 0
                 w_proposal = rnn.addnoiseandcopy(w,0,step_w) #np.random.normal(w, step_w, w_size)
-            eta_pro_vec = eta_vec + np.random.normal(0, step_eta, 1)
-            eta_pro = eta_pro_vec[0]
+            eta_pro = eta + np.random.normal(0, step_eta, 1)
+            # eta_pro = eta_pro_vec[0]
             # print('eta ki dusri baar me shape: ', eta_pro.shape)
-            tau_pro_vec = np.exp(eta_pro_vec)
+            # tau_pro_vec = np.exp(eta_pro_vec)
             tau_pro = np.exp(eta_pro)
             # print("TAU_PRO during training: ", tau_pro)
             # tau_pro = np.squeeze(tau_pro)[0]
             # print("tau pro ki baad me shape: ", tau_pro.shape)
-            [likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w_proposal,tau_pro_vec, temp= self.adapttemp)
-            [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w_proposal,tau_pro_vec, temp= self.adapttemp)
+            [likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w_proposal,tau_pro, temp= self.adapttemp)
+            [_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w_proposal,tau_pro, temp= self.adapttemp)
             # print(step_wise_rmsetest.shape,"shape of step wise rmse")
             prior_prop = self.prior_likelihood(sigma_squared, nu_1, nu_2, w_proposal,tau_pro,rnn)  # takes care of the gradients
             # print("prior proposal ", prior_prop)
@@ -292,7 +228,7 @@ class ptReplica(multiprocessing.Process):
                 likelihood = likelihood_proposal
                 prior_current = prior_prop
                 w = copy.deepcopy(w_proposal)
-                eta_vec = eta_pro_vec
+                eta = eta_pro
                 # acc_train[i+1,] = 0
                 # acc_test[i+1,] = 0
                 print(i,'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' accepted')
@@ -312,7 +248,7 @@ class ptReplica(multiprocessing.Process):
             if ((i+1) % self.swap_interval == 0 and i != 0 ):
                 print(str(i)+'th sample running')
                 w_size = rnn.getparameters(w).reshape(-1).shape[0]
-                param = np.concatenate([rnn.getparameters(w).reshape(-1), eta_vec, np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
+                param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
                 self.signal_main.set()
                 self.event.clear()
@@ -331,15 +267,15 @@ class ptReplica(multiprocessing.Process):
 
 
         # print(f'length of step_wise rmse before burnin: {step_wise_rmse_train.shape}, {step_wise_rmse_test.shape}')
-        param = np.concatenate([rnn.getparameters(w).reshape(-1), eta_vec, np.asarray([likelihood]),np.asarray([self.adapttemp]),np.asarray([i])]) #eta_vec.reshape(1)
-        
+
+        param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood]).reshape(1),np.asarray([self.adapttemp]),np.asarray([i])]) #eta_vec.reshape(1)
         # print("THIS IS THE PARAMETER QUEUE: ", param)
         # print("SHAPE OF PARAMETER QUUEU:" , param.shape)
         self.parameter_queue.put(param)
         self.signal_main.set()
-        print ((num_accepted*100 / (samples * 1.0)), f'% \samples out of {samples} were accepted')
+        print ((num_accepted*100 / (samples * 1.0)), f'% samples out of {samples} were accepted')
         accept_ratio = num_accepted / (samples * 1.0) * 100
-        print ((langevin_count*100 / (samples * 1.0)), '% \of total samples were Langevin')
+        print ((langevin_count*100 / (samples * 1.0)), '% of total samples were Langevin')
         langevin_ratio = langevin_count / (samples * 1.0) * 100
         file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperature)+ '.txt'
         np.savetxt(file_name,pos_w )
