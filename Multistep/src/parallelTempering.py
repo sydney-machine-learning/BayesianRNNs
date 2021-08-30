@@ -14,8 +14,14 @@ class ParallelTempering:
         self.train_y = train_y
         self.test_x = test_x
         self.test_y = test_y
+        self.batch_size_dict = {
+            'train_x':train_x.shape,
+            'train_y':train_y.shape,
+            'test_x' :test_x.shape,
+            'test_y' :test_y.shape
+        }
         self.topology = topology
-        self.rnn = Model(self.topology,learn_rate,rnn_net = rnn_net, optimizer= optimizer)
+        self.rnn = Model(self.topology,learn_rate,batch_size = self.batch_size_dict,input_size= 1,rnn_net = rnn_net, optimizer= optimizer)
         self.num_param = sum(p.numel() for p in self.rnn.parameters())#(topology[0] * topology[1]) + (topology[1] * topology[2]) + topology[1] + topology[2] + (topology[1] * topology[1])
         #Parallel Tempering variables
         self.swap_interval = swap_interval
@@ -270,10 +276,10 @@ class ParallelTempering:
             param_temp = param1
             param1 = param2
             param2 = param_temp
-            param1[self.num_param + 1] = lhood21
-            param2[self.num_param + 1] = lhood12
-            param1[self.num_param + 2] = T2
-            param2[self.num_param + 2] = T1
+            # param1[self.num_param + 1] = lhood2
+            # param2[self.num_param + 1] = lhood1
+            # param1[self.num_param + 2] = T2
+            # param2[self.num_param + 2] = T1
 
         else:
             swapped = False
