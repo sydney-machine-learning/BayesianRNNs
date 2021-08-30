@@ -17,7 +17,13 @@ class ptReplica(multiprocessing.Process):
         self.parameter_queue = parameter_queue
         self.signal_main = main_process
         self.event =  event
-        self.rnn = Model(topology,learn_rate,rnn_net=rnn_net, optimizer = optimizer)
+        self.batch_size = {
+            'train_x': trainx.shape,
+            'train_y': trainy.shape,
+            'test_x' : testx.shape,
+            'test_y' : testy.shape
+        }
+        self.rnn = Model(topology,learn_rate,batch_size= self.batch_size, input_size= 1,rnn_net=rnn_net, optimizer = optimizer)
         # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # self.rnn.to(device)
         # print(device," device of rnn")
@@ -47,10 +53,10 @@ class ptReplica(multiprocessing.Process):
         if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
         if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
         step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
-        old_rmse = np.sqrt(((pred-actual)**2).mean())
-        print(f"old rmse in code: {old_rmse}")
+        # old_rmse = np.sqrt(((pred-actual)**2).mean())
+        # print(f"old rmse in code: {old_rmse}")
         new_rmse = np.mean(step_wise_rmse)
-        print(f'new rmse : {new_rmse}')
+        print(f'rmse : {new_rmse}')
         return new_rmse
 
     def step_wise_rmse(self, pred, actual):
@@ -248,7 +254,12 @@ class ptReplica(multiprocessing.Process):
             if ((i+1) % self.swap_interval == 0 and i != 0 ):
                 print(str(i)+'th sample running')
                 w_size = rnn.getparameters(w).reshape(-1).shape[0]
-                param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
+                # print(rnn.getparameters(w).reshape(-1).shape)
+                # print(np.asarray([eta]).reshape(1).shape)
+                # print(np.asarray([likelihood*self.temperature]).shape)
+                # print(np.asarray([self.temperature]).shape)    
+                param = np.concatenate([rnn.getparameters(w).reshape(-1), np.asarray([eta]).reshape(1), 
+                                        np.asarray([likelihood*self.temperature]).reshape(-1),np.asarray([self.temperature])])
                 self.parameter_queue.put(param)
                 self.signal_main.set()
                 self.event.clear()
