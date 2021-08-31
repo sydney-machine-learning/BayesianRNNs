@@ -56,7 +56,7 @@ class ptReplica(multiprocessing.Process):
         # old_rmse = np.sqrt(((pred-actual)**2).mean())
         # print(f"old rmse in code: {old_rmse}")
         new_rmse = np.mean(step_wise_rmse)
-        print(f'rmse : {new_rmse}')
+        # print(f'rmse : {new_rmse}')
         return new_rmse
 
     def step_wise_rmse(self, pred, actual):
@@ -85,8 +85,8 @@ class ptReplica(multiprocessing.Process):
 
         log_lhood = p1 -  (p2 * np.sum(np.square(y -fx)) )
 
-        pseudo_loglhood =  log_lhood/temp
- 
+        pseudo_loglhood =  log_lhood/temp       
+        #question: what should go into parameter queue? log_lhood or pseudo_loglhood
         return [pseudo_loglhood, fx, rmse, step_wise_rmse]
 
 
@@ -129,7 +129,7 @@ class ptReplica(multiprocessing.Process):
         
         eta = np.log(np.var(pred_train - np.array(y_train)))
         tau_pro = np.exp(eta)
-        print("tau_pro: ", tau_pro)
+        # print("tau_pro: ", tau_pro)
 
         # eta = np.log(np.var(pred_train - np.array(y_train) , axis = 0, keepdims= True )) # [1,10,1]
         # tau_pro = np.exp(eta)

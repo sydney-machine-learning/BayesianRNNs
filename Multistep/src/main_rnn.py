@@ -123,6 +123,7 @@ def main():
 
     
     for j in [1,2,3,6] :
+    # for j in [2]:
         print(j, ' out of 15','\n\n\n')
         #i = j//2
         problem=j

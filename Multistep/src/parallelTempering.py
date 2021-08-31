@@ -263,7 +263,7 @@ class ParallelTempering:
         try:
             # swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))
             swap_proposal = min(1, 0.5*np.exp(min(709,lhood2-lhood1)))
-            print('Swap Proposal: ',swap_proposal)
+            # print('Swap Proposal: ',swap_proposal)
         except OverflowError as e:
             # print(f'lhood12: {lhood12}, lhood1: {lhood1}, lhood21: {lhood21}, lhood2: {lhood2}')
             # print("swap_proposal = min(1, np.exp((lhood12 - lhood1) + (lhood21 - lhood2)))")
