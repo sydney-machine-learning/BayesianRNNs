@@ -11,10 +11,11 @@ import random
 import copy
 import time
 import math
+import gc
 
 mpl.use('agg')
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=100, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=1000, dest="samples",type=int)
 # parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 # parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 # parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -427,34 +428,42 @@ class MCMC:
 				step_wise_rmse_test[i+1,] = step_wise_rmse_test[i,]
 				# acc_train[i+1,] = acc_train[i,]
 				# acc_test[i+1,] = acc_test[i,]
+		path = self.path
+		directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
+							# path+'/surrogate/learnsurrogate_data', 
+							path+'/posterior/pos_w',  path+'/posterior/pos_likelihood',
+							path+'/posterior/accept_list'  ] #path+'/posterior/surg_likelihood',
+		for d in directories:
+			if not os.path.exists(d):
+				os.makedirs(d)
 
 		print ((num_accepted*100 / (samples * 1.0)), f'% samples out of {samples} were accepted')
 		accept_ratio = num_accepted / (samples * 1.0) * 100
 		print ((langevin_count*100 / (samples * 1.0)), '% of total samples were Langevin')
 		langevin_ratio = langevin_count / (samples * 1.0) * 100
-		file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperature)+ '.txt'
+		file_name = self.path+'/posterior/pos_w/'+'single_chain' + '.txt'
 		np.savetxt(file_name,pos_w )
-		file_name = self.path+'/predictions/rmse_test_chain_'+ str(self.temperature)+ '.txt'
+		file_name = self.path+'/predictions/rmse_test_single_chain' + '.txt'
 		np.savetxt(file_name, rmse_test, fmt='%1.8f')
-		file_name = self.path+'/predictions/rmse_train_chain_'+ str(self.temperature)+ '.txt'
+		file_name = self.path+'/predictions/rmse_train_single_chain' + '.txt'
 		np.savetxt(file_name, rmse_train, fmt='%1.8f')
-		file_name = self.path+'/predictions/stepwise_rmse_train_chain_'+ str(self.temperature) + '.txt'
+		file_name = self.path+'/predictions/stepwise_rmse_train_single_chain'  + '.txt'
 		np.savetxt(file_name, step_wise_rmse_train, fmt = '%1.8f')
-		file_name = self.path + '/predictions/stepwise_rmse_test_chain_' + str(self.temperature) + '.txt'
+		file_name = self.path + '/predictions/stepwise_rmse_test_csingle_chain'  + '.txt'
 		np.savetxt(file_name, step_wise_rmse_test, fmt = '%1.8f')
-		file_name = self.path+'/posterior/pos_likelihood/chain_'+ str(self.temperature)+ '.txt'
+		file_name = self.path+'/posterior/pos_likelihood/single_chain' + '.txt'
 		np.savetxt(file_name,likeh_list, fmt='%1.4f')
-		file_name = self.path + '/posterior/accept_list/chain_' + str(self.temperature) + '_accept.txt'
+		file_name = self.path + '/posterior/accept_list/csingle_chain'  + '_accept.txt'
 		np.savetxt(file_name, [accept_ratio], fmt='%1.4f')
-		file_name = self.path + '/posterior/accept_list/chain_' + str(self.temperature) + '.txt'
+		file_name = self.path + '/posterior/accept_list/csingle_chain'  + '.txt'
 		np.savetxt(file_name, accept_list, fmt='%1.4f')
-		file_name = self.path + '/predictions/final_pred_train_chain_' + str(self.temperature) + '.txt'
+		file_name = self.path + '/predictions/final_pred_train_csingle_chain'  + '.txt'
 		np.savetxt(file_name, np.squeeze(pred_train), fmt='%1.4f')
-		file_name = self.path + '/predictions/final_pred_test_chain_' + str(self.temperature) + '.txt'
+		file_name = self.path + '/predictions/final_pred_test_csingle_chain'  + '.txt'
 		np.savetxt(file_name, np.squeeze(pred_test), fmt= '%1.4f')
 
 
-		return(pos_w, rmse_train, rmse_test,accept_list, accept_ratio)            
+		return(pos_w, rmse_train, step_wise_rmse_train, rmse_test, step_wise_rmse_test ,accept_list, accept_ratio, likeh_list)            
 
 
 def main():
@@ -567,7 +576,7 @@ def main():
 					learn_rate = learn_rate, samples= NumSample,trainx= train_x, 
 					trainy= train_y, testx= test_x, testy= test_y,
 					topology= topology,path = path, rnn_net = net, optimizer= optimizer)
-		[pos_w, rmse_train, rmse_test,accept_vec, accept_ratio] = mcmc.sampler()
+		[pos_w, rmse_train, indiv_rmse_train, rmse_test, indiv_rmse_test ,accept_vec, accept_ratio, likelihood] = mcmc.sampler()
 
 		timer2 = time.time()
 
@@ -576,11 +585,11 @@ def main():
 		rmse_train = rmse_train[int(burn_in):]
 		rmse_test = rmse_test[int(burn_in):]
 
-		rmse_tr = np.mean(rmse_train[int(burnin):])
-		rmsetr_std = np.std(rmse_train[int(burnin):])
-		rmse_tes = np.mean(rmse_test[int(burnin):])
-		rmsetest_std = np.std(rmse_test[int(burnin):])
-		printr(mse_tr, rmsetr_std, rmse_tes, rmsetest_std)
+		rmse_tr = np.mean(rmse_train[int(burn_in):])
+		rmsetr_std = np.std(rmse_train[int(burn_in):])
+		rmse_tes = np.mean(rmse_test[int(burn_in):])
+		rmsetest_std = np.std(rmse_test[int(burn_in):])
+		print(rmse_tr, rmsetr_std, rmse_tes, rmsetest_std)
 
  
 
@@ -598,10 +607,10 @@ def main():
 			for i in range(pos_w.shape[0]):
 				histogram_trace(pos_w[i,:], path+ '/trace_plots_better/'+ str(i))
 
-
-
-		accept_ratio = accept_vec[:,  list_end-1:list_end]/list_end
-		accept_per = np.mean(accept_ratio) * 100
+		
+		
+		
+		accept_per = accept_ratio
 		print(accept_per, ' accept_percentage')
 		# timer2 = time.time()
 		timetotal = (timer2 - timer) /60
@@ -653,9 +662,9 @@ def main():
 
 		np.savetxt(outres_step, step_wise_results, fmt = '%1.4f', newline= ' \n')
 		# np.savetxt(outres_step_db, step_wise_results, fmt= '%1.4f', newline = ' \n')
-		allres =  np.asarray([ problem, NumSample, maxtemp, swap_interval, langevin_prob, learn_rate,  
-								rmse_tr, rmsetr_std, rmsetr_max, rmse_tes, rmsetest_std, rmsetes_max, 
-								swap_perc, accept_per, timetotal])
+		allres =  np.asarray([ problem, NumSample, langevin_prob, learn_rate,  
+								rmse_tr, rmsetr_std, rmsetr_max, rmse_tes, rmsetest_std, rmsetes_max
+								, accept_per, timetotal])
 		# np.savetxt(outres_db,  allres   , fmt='%1.4f', newline=' '  )
 		np.savetxt(resultingfile_db,   allres   , fmt='%1.4f',  newline=' ' )
 		np.savetxt(resultingfile_db, [xv]   ,  fmt="%s", newline=' \n' )
@@ -678,29 +687,29 @@ def main():
 		plt.ylabel('RMSE', fontsize=12)
 		plt.savefig(path+'/rmse_samples.pdf')
 		plt.clf()
-		likelihood = likelihood_rep[:,0] # just plot proposed likelihood
-		likelihood = np.asarray(np.split(likelihood, num_chains))
+		# likelihood = likelihood_rep[:,0] # just plot proposed likelihood
+		# likelihood = np.asarray(np.split(likelihood, num_chains))
 	# Plots
 		plt.plot(likelihood.T)
 		plt.xlabel('Samples', fontsize=12)
 		plt.ylabel(' Log-Likelihood', fontsize=12)
 		plt.savefig(path+'/likelihood.png')
 		plt.clf()
-		plt.plot(likelihood.T)
-		plt.xlabel('Samples', fontsize=12)
-		plt.ylabel(' Log-Likelihood', fontsize=12)
-		plt.savefig(path_db+'/likelihood.png')
-		plt.clf()
+		# plt.plot(likelihood.T)
+		# plt.xlabel('Samples', fontsize=12)
+		# plt.ylabel(' Log-Likelihood', fontsize=12)
+		# plt.savefig(path_db+'/likelihood.png')
+		# plt.clf()
 		plt.plot(accept_vec.T )
 		plt.xlabel('Samples', fontsize=12)
 		plt.ylabel(' Number accepted proposals', fontsize=12)
 		plt.savefig(path+'/accept.png')
 		plt.clf()
-		plt.plot(accept_vec.T )
-		plt.xlabel('Samples', fontsize=12)
-		plt.ylabel(' Number accepted proposals', fontsize=12)
-		plt.savefig(path_db+'/accept.png')
-		plt.clf()
+		# plt.plot(accept_vec.T )
+		# plt.xlabel('Samples', fontsize=12)
+		# plt.ylabel(' Number accepted proposals', fontsize=12)
+		# plt.savefig(path_db+'/accept.png')
+		# plt.clf()
 
 		gc.collect()
 		outres.close()
