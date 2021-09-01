@@ -5,7 +5,7 @@ import numpy as np
 
 class Model(nn.Module):
         # Defining input size, hidden layer size, output size and batch size respectively
-    def __init__(self, topo,lrate,batch_size, input_size = 1,rnn_net = 'RNN', optimizer = 'SGD'):
+    def __init__(self, topo,lrate,batch_size = 1, input_size = 1,rnn_net = 'RNN', optimizer = 'SGD'):
         """
             rnn_net = RNN/LSTM
             optimizer = Adam/ SGD

@@ -318,3 +318,4 @@ class ptReplica(multiprocessing.Process):
         np.savetxt(file_name, np.squeeze(pred_test), fmt= '%1.4f')
 
         print('exiting this thread')
+    
