@@ -15,7 +15,7 @@ import gc
 
 mpl.use('agg')
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=1000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=20, dest="samples",type=int)
 # parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 # parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 # parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -133,6 +133,7 @@ class Model(nn.Module):
 		self.batch_size = 1
 		self.lrate = lrate
 		self.optimizer = optimizer
+		
 		self.rnn_net = rnn_net
 		if rnn_net == 'RNN':
 			self.hidden = torch.ones(self.n_layers, self.batch_size, self.hidden_dim)
@@ -193,13 +194,13 @@ class Model(nn.Module):
 
 		return copy.deepcopy(np.array(y_pred.detach()))
 
-	def langevin_gradient(self,x,y,w):
+	def langevin_gradient(self,x,y,w,optimizer):
 		self.loadparameters(w)
 		criterion = torch.nn.MSELoss()
-		if self.optimizer == 'SGD':
-			optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
-		elif self.optimizer == 'Adam':
-			optimizer = torch.optim.Adam(self.parameters(),lr = self.lrate)
+		# if self.optimizer == 'SGD':
+		# 	optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
+		# elif self.optimizer == 'Adam':
+		# 	optimizer = torch.optim.Adam(self.parameters(),lr = self.lrate)
 		for k in range(1):#computing gradients 5 times 
 			outmain=torch.zeros((len(x),self.topo[2],1))
 			for i,sample in enumerate(x):
@@ -359,15 +360,21 @@ class MCMC:
 		pt_samples = samples * 0.6 # this means that PT in canonical form with adaptive temp will work till pt  samples are reached
 		init_count = 0
 
+		#initializing optimizer:
+		if self.optimizer == 'SGD':
+			optimizer = torch.optim.SGD(rnn.parameters(),lr= self.learn_rate)
+		elif self.optimizer == 'Adam':
+			optimizer = torch.optim.Adam(rnn.parameters(),lr = self.learn_rate)
+		
 		i=0
 		for i in range(samples-1):  # Begin sampling --------------------------------------------------------------------------
 			timer1 = time.time()
 			lx = np.random.uniform(0,1,1)
 			old_w = rnn.state_dict()
 			if (self.use_langevin_gradients is True) and (lx< self.l_prob):
-				w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w)) # Eq 8
+				w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w),optimizer= optimizer ) # Eq 8
 				w_proposal = rnn.addnoiseandcopy(w_gd,0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
-				w_prop_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w_proposal))
+				w_prop_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w_proposal),optimizer= optimizer)
 				#first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat))
 				#second = np.log(multivariate_normal.pdf(w_proposal , w_gd , sigma_diagmat)) # this gives numerical instability - hence we give a simple implementation next that takes out log
 				wc_delta = (rnn.getparameters(w)- rnn.getparameters(w_prop_gd))
