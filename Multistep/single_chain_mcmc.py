@@ -15,7 +15,7 @@ import gc
 
 mpl.use('agg')
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=100, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=30, dest="samples",type=int)
 # parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 # parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 # parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -169,6 +169,7 @@ class Model(nn.Module):
 			output = output.reshape(outmain[i].shape)
 			# print(",out.shape)
 			outmain[i,] = copy.deepcopy(output.detach())
+			# outmain[i,] = copy.deepcopy(output)
 		# print("shape of outmain", np.squeeze(outmain,axis = -1).shape)
 		# print("shape of x",x.shape)
 		return copy.deepcopy(outmain)
@@ -201,13 +202,27 @@ class Model(nn.Module):
 		return copy.deepcopy(np.array(y_pred.detach()))
 
 	def langevin_gradient(self,x,y,w,optimizer):
-		self.loadparameters(w)
+		try:
+			self.loadparameters(torch.load('parameters.pt'))
+			# self.loadparameters(w)
+		except:
+			self.loadparameters(w)
 		criterion = torch.nn.MSELoss()
 		# if self.optimizer == 'SGD':
 		# 	optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
 		# elif self.optimizer == 'Adam':
 		# 	optimizer = torch.optim.Adam(self.parameters(),lr = self.lrate)
-		for k in range(1):#computing gradients 5 times 
+		# optimizer.zero_grad()
+		# outmain = self.forward(x)
+		# print(outmain.shape)
+		# # outmain=torch.zeros((len(x),self.topo[2],1))
+		# # loss = criterion(outmain, torch.FloatTensor(y.view(outmain.shape)))
+		# print(y.shape)
+		# loss = criterion(outmain, torch.FloatTensor(y))
+		# loss.backward()
+		# optimizer.step()
+		# output = copy.deepcopy(outmain.detach())
+		for k in range(2):#computing gradients 5 times 
 			outmain=torch.zeros((len(x),self.topo[2],1))
 			for i,sample in enumerate(x):
 				optimizer.zero_grad()
@@ -222,15 +237,31 @@ class Model(nn.Module):
 				h1 = h1.view(-1, self.hidden_dim)
 				output = self.fc(h1)
 				output = self.sigmoid(output)
+
 				loss = criterion(output,torch.FloatTensor(y[i]).view(output.shape))
 				loss.backward()
 				optimizer.step()
 				output = output.reshape(outmain[i].shape)
 				outmain[i,] = copy.deepcopy(output.detach())
 
-			loss_val = criterion(outmain,torch.FloatTensor(y))
-			# print(f'loss for k = {k}: {np.sqrt(loss_val.detach().numpy())}')
-		return copy.deepcopy(self.state_dict())
+		loss_val = criterion(outmain,torch.FloatTensor(y))
+		print(f'root of MSEloss for k = {k}: {np.sqrt(loss_val.detach().numpy())}')
+
+
+		parameters = copy.deepcopy(self.state_dict())
+		
+		actual = y
+		pred = outmain
+		# print(actual.shape)
+		# print(outmain.shape)
+		if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
+		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred.numpy(), axis = 2)
+		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
+		new_rmse = np.mean(step_wise_rmse)
+		print(f'rmse as calculated in mcmc.rmse():{new_rmse}')
+
+		torch.save(parameters,'parameters.pt')
+		return parameters
 	#returns a np arraylist of weights and biases -- layerwise
 	# in order i.e. weight and bias of input and hidden then weight and bias for hidden to out
 	def getparameters(self,w = None):
@@ -300,8 +331,14 @@ class MCMC:
 
 
 	def likelihood_func(self, rnn,x,y, w, tau_sq, temp):
-		fx = rnn.evaluate_proposal(x,w)
+		# fx = rnn.evaluate_proposal(x,w)
+		rnn.loadparameters(w)
+		fx = copy.deepcopy(np.array(rnn.forward(x).detach()))
+		# print(fx.shape)
+		# print(y.shape)
+		
 		rmse = self.rmse(fx, y)
+		print(f'rmse as calculated in likelihood func:{rmse}')
 		step_wise_rmse = self.step_wise_rmse(fx,y) 
 		n = y.shape[0] * y.shape[1]
 		p1 = -(n/2)*np.log(2*math.pi*tau_sq) 
@@ -382,8 +419,10 @@ class MCMC:
 			# old_w = rnn.state_dict()
 			if (self.use_langevin_gradients is True) and (lx< self.l_prob):
 				w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w),optimizer= optimizer ) # Eq 8
+				# w_gd = torch.load('parameters.pt')
 				w_proposal = rnn.addnoiseandcopy(w_gd,0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
 				w_prop_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w_proposal),optimizer= optimizer)
+				# w_prop_gd = torch.load('parameters.pt')
 				#first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat))
 				#second = np.log(multivariate_normal.pdf(w_proposal , w_gd , sigma_diagmat)) # this gives numerical instability - hence we give a simple implementation next that takes out log
 				wc_delta = (rnn.getparameters(w)- rnn.getparameters(w_prop_gd))
@@ -427,7 +466,7 @@ class MCMC:
 				num_accepted  =  num_accepted + 1
 				likelihood = likelihood_proposal
 				prior_current = prior_prop
-				w = copy.deepcopy(w_proposal)
+				w = copy.deepcopy(torch.load('parameters.pt'))
 				eta = eta_pro
 				# acc_train[i+1,] = 0
 				# acc_test[i+1,] = 0
@@ -495,7 +534,7 @@ def main():
 	print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_single_chain/')
 
 	
-	for j in [1,2,3,6] :
+	for j in [1] :
 	# for j in [2]:
 		print(j, ' out of 15','\n\n\n')
 		#i = j//2
