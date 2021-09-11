@@ -109,130 +109,59 @@ def plot_figure(lista, title,path):
 
 
 
-
-class Model(nn.Module):
-		# Defining input size, hidden layer size, output size and batch size respectively
-	def __init__(self, topo,lrate,batch_size, input_size = 1,rnn_net = 'RNN', optimizer = 'SGD'):
-		"""
-			rnn_net = RNN/LSTM
-			optimizer = Adam/ SGD
-			topology = [input size, hidden size, output size]
-			output size would be the same as num_classes
-			num_classes =  topo[2]
-			input_size = 1
-			hidden_state = hidden_size = 10
-
-		"""
-		super(Model, self).__init__()
-		# assuming num_dicrections to be 1 for all the cases
-		# Defining some parameters
-		self.hidden_dim = topo[1]#hidden_dim
-		self.input_seq_len = topo[0]
-		self.num_outputs = topo[2]
-		self.input_size = input_size
-		self.n_layers = 1   #len(topo)-2 #n_layers
-		self.batch_size = 1
+class fnn(nn.Module):
+	def __init__(self, topo, lrate, optimizer = 'Adam'):
+		super(fnn, self).__init__()
+		self.hidden_dim = topo[1] #not needed
+		self.input_len = topo[0]
+		self.output_len = topo[2]
 		self.lrate = lrate
 		self.optimizer = optimizer
-		
-		self.rnn_net = rnn_net
-		if rnn_net == 'RNN':
-			self.hidden = torch.ones(self.n_layers, self.batch_size, self.hidden_dim)
-			self.rnn = nn.RNN(input_size = self.input_size, hidden_size = topo[1], num_layers = self.n_layers, batch_first= True)
-		if rnn_net == 'LSTM':
-			self.hidden = (torch.ones((self.n_layers,self.batch_size,self.hidden_dim)), torch.ones((self.n_layers,self.batch_size,self.hidden_dim)))
-			self.rnn = nn.LSTM(input_size = self.input_size, hidden_size = topo[1],num_layers= self.n_layers, batch_first= True)
-			# Fully connected layer
-		self.fc = nn.Linear(topo[1],topo[2])
 		self.topo = topo
-		print(rnn_net, ' is rnn net')
-	def sigmoid(self, z):
-		return 1/(1+torch.exp(-z))
-			 
+
+		self.fc = nn.Linear(in_features= 5, out_features= 10)
+
 
 	def forward(self, x):
-		# print(x.shape)
-		outmain=torch.zeros((len(x),self.topo[2],1))
-		for i,sample in enumerate(x):
-			sample = torch.FloatTensor(sample)
-			# sequence length = 1
-			sample = sample.view(1,self.input_seq_len, self.input_size)
-			# sample = sample.view(sample.shape[0],1,self.topo[0])
-			hidden = copy.deepcopy(self.hidden)
-			if self.rnn_net == 'LSTM':
-				out, (h1,c1) = self.rnn(sample, hidden)
-			elif self.rnn_net == 'RNN':
-				out, h1 = self.rnn(sample, hidden)
-			h1 = h1.view(-1, self.hidden_dim)
-			output = self.fc(h1)
-			output = self.sigmoid(output)
-			output = output.reshape(outmain[i].shape)
-			# print(",out.shape)
-			outmain[i,] = copy.deepcopy(output.detach())
-		# print("shape of outmain", np.squeeze(outmain,axis = -1).shape)
-		# print("shape of x",x.shape)
-		return copy.deepcopy(outmain)
+		batch_size = len(x)
+		x = torch.FloatTensor(x)
+		ip = x.view(batch_size, self.topo[0])
+		# print(self.fc.state_dict())
+		out = self.fc(ip)
+		out = out.view(batch_size, self.topo[2], 1)
+		return out 
 
-	def init_hidden(self, batch_size):
-		# This method generates the first hidden state of zeros which we'll use in the forward pass
-		# We'll send the tensor holding the hidden state to the device we specified earlier as well
-		hidden = torch.zeros(self.n_layers, batch_size, self.hidden_dim)
-		return hidden        # Create a brnn -- assuming h0 size = 5 i.e. hidden layer has 5 nuerons
-	def dictfromlist(self,param):
-		dic = {}
-		i=0
-		for name in sorted(self.state_dict().keys()):
-			dic[name] = torch.FloatTensor(param[i:i+(self.state_dict()[name]).view(-1).shape[0]]).view(self.state_dict()[name].shape)
-			i += (self.state_dict()[name]).view(-1).shape[0]
-		#self.loadparameters(dic)
-		return dic
-	def evaluate_proposal(self,x,w):
-		# if w is None:
-		# 	y_pred = self.forward(x)
-		# 	return copy.deepcopy(y_pred.detach().numpy())
-		# else:
-		# print(f"param given into evaluate proposal: {w['rnn.weight_ih_l0'][:4].T}")
-		
-		self.loadparameters(w)
-		# print(f"param of model class: {self.state_dict()}")
-		y_pred = self.forward(x)
+	def evaluate_proposal(self, x, w):
+		self.load_state_dict(w)
+		out = self.forward(x)
+		return copy.deepcopy(np.array(out.detach()))	
 
-
-		return copy.deepcopy(np.array(y_pred.detach()))
-
-	def langevin_gradient(self,x,y,w,optimizer):
+	def langevin_gradient(self, x, y, w, optimizer):		
 		self.loadparameters(w)
 		criterion = torch.nn.MSELoss()
-		# if self.optimizer == 'SGD':
-		# 	optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
-		# elif self.optimizer == 'Adam':
-		# 	optimizer = torch.optim.Adam(self.parameters(),lr = self.lrate)
-		for k in range(1):#computing gradients 5 times 
-			outmain=torch.zeros((len(x),self.topo[2],1))
-			for i,sample in enumerate(x):
-				optimizer.zero_grad()
-				sample = torch.FloatTensor(sample)
-				sample = sample.view(1,self.input_seq_len,self.input_size)
-				hidden = copy.deepcopy(self.hidden)
-				
-				if self.rnn_net == 'LSTM':
-					out, (h1,c1) = self.rnn(sample, hidden)
-				elif self.rnn_net == 'RNN':
-					out, h1 = self.rnn(sample, hidden)
-				h1 = h1.view(-1, self.hidden_dim)
-				output = self.fc(h1)
-				output = self.sigmoid(output)
-				loss = criterion(output,torch.FloatTensor(y[i]).view(output.shape))
-				loss.backward()
-				optimizer.step()
-				output = output.reshape(outmain[i].shape)
-				outmain[i,] = copy.deepcopy(output.detach())
+		outmain=torch.zeros((len(x),self.topo[2],1))
 
-			loss_val = criterion(outmain,torch.FloatTensor(y))
-			# print(f'loss for k = {k}: {np.sqrt(loss_val.detach().numpy())}')
+		batch_size = len(x)
+		optimizer.zero_grad()
+		sample = torch.FloatTensor(x)
+		sample = sample.view(batch_size, self.topo[0])
+		out = self.forward(sample)
+		out = out.view(y.shape)
+		loss = criterion(out, torch.FloatTensor(y))
+		loss.backward()
+		optimizer.step()
+		output = output.reshape(outmain)
+
 		return copy.deepcopy(self.state_dict())
-	#returns a np arraylist of weights and biases -- layerwise
-	# in order i.e. weight and bias of input and hidden then weight and bias for hidden to out
+
+
+	def addnoiseandcopy(self,w,mea,std_dev):
+		dic = {}
+		for name in (w.keys()):
+			dic[name] = copy.deepcopy(w[name]) + torch.zeros(w[name].size()).normal_(mean = mea, std = std_dev)
+		return dic
+
+
 	def getparameters(self,w = None):
 		l=np.array([1,2])
 		dic = {}
@@ -244,31 +173,22 @@ class Model(nn.Module):
 			l=np.concatenate((l,np.array(copy.deepcopy(dic[name])).reshape(-1)),axis=None)
 		l = l[2:]
 		return l
-	# input a dictionary of same dimensions
+
 	def loadparameters(self,param):
-		self.load_state_dict(param)
-	# input weight dictionary, mean, std dev
-	def addnoiseandcopy(self,w,mea,std_dev):
-		dic = {}
-		for name in (w.keys()):
-			dic[name] = copy.deepcopy(w[name]) + torch.zeros(w[name].size()).normal_(mean = mea, std = std_dev)
-		return dic
+		self.load_state_dict(param)	
 
 
-# mcmc = MCMC(use_langevin_gradients, l_prob = langevin_prob,
-# 					learn_rate = learn_rate, samples= NumSample,trainx= train_x, 
-# 					trainy= train_y, testx= test_x, testy= test_y,
-# 					topology= topology, )
+
+
 
 class MCMC:
-	def __init__(self,  use_langevin_gradients , l_prob,  learn_rate,  samples, trainx, trainy, testx, testy, topology,path, rnn_net = 'LSTM', optimizer = 'Adam'):
+	def __init__(self,  use_langevin_gradients , l_prob,  learn_rate,  samples, trainx, trainy, testx, testy, topology,path, optimizer = 'Adam'):
 		self.samples = samples  # NN topology [input, hidden, output]
 		self.topology = topology  # max epocs
 		self.train_x = trainx
 		self.train_y = trainy
 		self.test_x = testx
 		self.test_y = testy
-		self.rnn_net = rnn_net
 		self.path = path
 		self.optimizer = optimizer
 		self.batch_size = {
@@ -277,7 +197,7 @@ class MCMC:
 			'test_x' : testx.shape,
 			'test_y' : testy.shape,
 		}
-		self.rnn = Model(topology,learn_rate,batch_size= self.batch_size, input_size= 1,rnn_net=self.rnn_net, optimizer = self.optimizer)
+		self.rnn = fnn(topology,learn_rate,optimizer = self.optimizer)
 		self.use_langevin_gradients  =  use_langevin_gradients 
 
 		self.l_prob = l_prob # likelihood prob
@@ -318,7 +238,6 @@ class MCMC:
 		log_loss = part1 - part2  - (1 + nu_1) * np.log(tausq) - (nu_2 / tausq)
 		return log_loss
 
-
 	def sampler(self):
 		samples = self.samples
 		x_test = self.test_x
@@ -341,8 +260,7 @@ class MCMC:
 		#Declare RNN
 		pred_train  = rnn.evaluate_proposal(x_train,w) #
 		pred_test  = rnn.evaluate_proposal(x_test, w) #
-		print(pred_train.shape)
-		print(y_train.shape)
+
 		eta = np.log(np.var(pred_train - np.array(y_train)))
 		tau_pro = np.exp(eta)
 
@@ -487,9 +405,11 @@ class MCMC:
 		return(pos_w, rmse_train, step_wise_rmse_train, rmse_test, step_wise_rmse_test ,accept_list, accept_ratio, likeh_list)            
 
 
+
 def main():
 	n_steps_in, n_steps_out = 5,10
-	net = 'RNN' if args.net == 1 else 'LSTM' 
+	# net = 'RNN' if args.net == 1 else 'LSTM' 
+	net = 'FNN'
 	optimizer = 'SGD' if args.optimizer == 1 else 'Adam'
 	print(f"Network is {net} and optimizer is {optimizer}")
 	print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_single_chain/')
@@ -591,12 +511,13 @@ def main():
 		# resultingfile = open( path+'/master_result_file.txt','a+')
 		# resultingfile_db = open( path_db+'/master_result_file.txt','a+')
 		timer = time.time()
-		langevin_prob = 0.9
+		langevin_prob = 0
 
+		
 		mcmc = MCMC(use_langevin_gradients, l_prob = langevin_prob,
-					learn_rate = learn_rate, samples= NumSample,trainx= train_x, 
-					trainy= train_y, testx= test_x, testy= test_y,
-					topology= topology,path = path, rnn_net = net, optimizer= optimizer)
+					learn_rate = learn_rate, samples= NumSample, trainx = train_x,
+					trainy = train_y, testx = test_x, testy= test_y, topology = topology,
+					path= path, optimizer= optimizer)
 		[pos_w, rmse_train, indiv_rmse_train, rmse_test, indiv_rmse_test ,accept_vec, accept_ratio, likelihood] = mcmc.sampler()
 
 		timer2 = time.time()
@@ -741,6 +662,3 @@ def main():
 		# outres_db.close()
 
 if __name__ == "__main__": main()
-
-# pos_w, fx_train, fx_test, rmse_train, rmse_test, indiv_rmse_train, indiv_rmse_test, likelihood_rep, swap_perc, accept_vec, accept = pt.run_chains()
-		
