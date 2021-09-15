@@ -203,8 +203,8 @@ class Model(nn.Module):
 
 	def langevin_gradient(self,x,y,w,optimizer):
 		try:
-			self.loadparameters(torch.load('parameters.pt'))
-			# self.loadparameters(w)
+			# self.loadparameters(torch.load('parameters.pt'))
+			self.loadparameters(w)
 		except:
 			self.loadparameters(w)
 		criterion = torch.nn.MSELoss()
@@ -222,7 +222,7 @@ class Model(nn.Module):
 		# loss.backward()
 		# optimizer.step()
 		# output = copy.deepcopy(outmain.detach())
-		for k in range(2):#computing gradients 5 times 
+		for k in range(1):#computing gradients 5 times 
 			outmain=torch.zeros((len(x),self.topo[2],1))
 			for i,sample in enumerate(x):
 				optimizer.zero_grad()
@@ -258,9 +258,9 @@ class Model(nn.Module):
 		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred.numpy(), axis = 2)
 		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
 		new_rmse = np.mean(step_wise_rmse)
-		print(f'rmse as calculated in mcmc.rmse():{new_rmse}')
+		# print(f'rmse as calculated in mcmc.rmse():{new_rmse}')
 
-		torch.save(parameters,'parameters.pt')
+		# torch.save(parameters,'parameters.pt')
 		return parameters
 	#returns a np arraylist of weights and biases -- layerwise
 	# in order i.e. weight and bias of input and hidden then weight and bias for hidden to out
@@ -309,7 +309,8 @@ class MCMC:
 			'test_y' : testy.shape,
 		}
 		self.rnn = Model(topology,learn_rate,batch_size= self.batch_size, input_size= 1,rnn_net=self.rnn_net, optimizer = self.optimizer)
-		self.use_langevin_gradients  =  use_langevin_gradients 
+		self.use_langevin_gradients  =  use_langevin_gradients
+		# self.use_langevin_gradients  =  False 
 
 		self.l_prob = l_prob # likelihood prob
 
@@ -332,7 +333,11 @@ class MCMC:
 
 	def likelihood_func(self, rnn,x,y, w, tau_sq, temp):
 		# fx = rnn.evaluate_proposal(x,w)
-		rnn.loadparameters(w)
+		# rnn.loadparameters(w)
+		try:
+			rnn.load_state_dict(w)
+		except:
+			rnn.load_state_dict(w)
 		fx = copy.deepcopy(np.array(rnn.forward(x).detach()))
 		# print(fx.shape)
 		# print(y.shape)
@@ -419,8 +424,22 @@ class MCMC:
 			# old_w = rnn.state_dict()
 			if (self.use_langevin_gradients is True) and (lx< self.l_prob):
 				w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w),optimizer= optimizer ) # Eq 8
+				
+				outmain = rnn.forward(self.train_x)
+				actual = self.train_y
+				pred = outmain
+				# print(actual.shape)
+				# print(outmain.shape)
+				if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
+				if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred.numpy(), axis = 2)
+				step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
+				new_rmse = np.mean(step_wise_rmse)
+				print("..................: ", new_rmse)
+				
+				
 				# w_gd = torch.load('parameters.pt')
 				w_proposal = rnn.addnoiseandcopy(w_gd,0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
+
 				w_prop_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w_proposal),optimizer= optimizer)
 				# w_prop_gd = torch.load('parameters.pt')
 				#first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat))
