@@ -152,6 +152,7 @@ class Model(nn.Module):
 	def forward(self, x):
 		# print(x.shape)
 		outmain=torch.zeros((len(x),self.topo[2],1))
+		# print("and these parameters are being used int forward function: ", self.state_dict()["rnn.weight_ih_l0"][:4].T)
 		for i,sample in enumerate(x):
 			sample = torch.FloatTensor(sample)
 			# sequence length = 1
@@ -195,9 +196,8 @@ class Model(nn.Module):
 		
 		self.loadparameters(w)
 		# print(f"param of model class: {self.state_dict()}")
+		# print("ig this is still consistent here : ",w["rnn.weight_ih_l0"][:4].T)
 		y_pred = self.forward(x)
-
-
 		return copy.deepcopy(np.array(y_pred.detach()))
 
 	def langevin_gradient(self,x,y,w,optimizer):
@@ -211,8 +211,8 @@ class Model(nn.Module):
 
 
 		criterion = torch.nn.MSELoss()
-
-
+		# print("inside langevin gradient function",self.state_dict()["rnn.weight_ih_l0"][:4].T)
+		# print("but this was what was passed: ", w["rnn.weight_ih_l0"][:4].T)
 
 		# if self.optimizer == 'SGD':
 		# 	optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
@@ -228,7 +228,7 @@ class Model(nn.Module):
 		# loss.backward()
 		# optimizer.step()
 		# output = copy.deepcopy(outmain.detach())
-		for k in range(1):#computing gradients 5 times 
+		for k in range(5):#computing gradients 5 times 
 			outmain=torch.zeros((len(x),self.topo[2],1))
 			for i,sample in enumerate(x):
 				optimizer.zero_grad()
@@ -341,9 +341,9 @@ class MCMC:
 		#rnn.loadparameters(w) 
 
 		#fx = copy.deepcopy(np.array(rnn.forward(x).detach()))
-
+		# print(w["rnn.weight_ih_l0"][:4].T, " was passed into the likelihood func")
 		fx = rnn.evaluate_proposal(x,w)
-	 
+	 	
 		
 		rmse = self.rmse(fx, y)
 		#print(f'rmse as calculated in likelihood func:{rmse}')
@@ -353,6 +353,7 @@ class MCMC:
 		p2 = (1/(2*tau_sq)) 
 		log_lhood = p1 -  (p2 * np.sum(np.square(y -fx)) )
 		pseudo_loglhood =  log_lhood/temp  
+		
 
     
 		return [pseudo_loglhood, fx, rmse, step_wise_rmse]
@@ -382,6 +383,7 @@ class MCMC:
 		rmse_test = np.zeros(samples)
 
 		w = copy.deepcopy(rnn.state_dict())
+		# print("w of the beginning: ", w["rnn.weight_ih_l0"][:4].T)
 		eta = 0 #Junk variable
 		step_w = 0.025
 		step_eta = 0.2
@@ -435,6 +437,7 @@ class MCMC:
 				#first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat))
 				#second = np.log(multivariate_normal.pdf(w_proposal , w_gd , sigma_diagmat)) # this gives numerical instability - hence we give a simple implementation next that takes out log
 				wc_delta = (rnn.getparameters(w)- rnn.getparameters(w_prop_gd))
+				# print(wc_delta,'wc_delta', wc_delta.shape)
 				wp_delta = (rnn.getparameters(w_proposal) - rnn.getparameters(w_gd))
 				sigma_sq = step_w ** 2   #should this value be squared or not? squared is fine
 				first = -0.5 * np.sum(wc_delta  *  wc_delta  ) / sigma_sq  # this is wc_delta.T  *  wc_delta /sigma_sq
@@ -466,15 +469,22 @@ class MCMC:
 			# if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
 			# 	x = 0
 			u = np.log(random.uniform(0, 1))
+			print("why mh_prob is quite a large number?")
+			print(diff_likelihood)
+			print(diff_prior)
+			print(diff_prop)
+			print('first',first)
+			print('second',second)
+			
 			# u = random.uniform(0,1)
-
+			print(mh_prob,'.....................')
 			prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
-			if u < mh_prob:
+			if u > mh_prob:
 				num_accepted  =  num_accepted + 1
 				likelihood = likelihood_proposal
 				prior_current = prior_prop
-				w = copy.deepcopy(torch.load('parameters.pt'))
+				w = copy.deepcopy(w_proposal)
 				eta = eta_pro
 				# acc_train[i+1,] = 0
 				# acc_test[i+1,] = 0
