@@ -17,12 +17,12 @@ from sklearn.preprocessing import MinMaxScaler
 import os
 import math
 
-from google.colab import drive
-drive.mount('/content/drive')
+# from google.colab import drive
+# drive.mount('/content/drive')
 
-training_set = pd.read_csv('/data/Sunspot/train1.csv',index_col=0)
+training_set = pd.read_csv('./data/Sunspot/train1.csv',index_col=0)
 training_set = training_set.values
-test_set = pd.read_csv('/data/Sunspot/test1.csv',index_col=0)
+test_set = pd.read_csv('./data/Sunspot/test1.csv',index_col=0)
 test_set = test_set.values
 
 
