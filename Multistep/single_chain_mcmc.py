@@ -15,7 +15,7 @@ import gc
 
 mpl.use('agg')
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=30, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=100, dest="samples",type=int)
 # parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 # parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 # parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -121,7 +121,6 @@ class Model(nn.Module):
 			num_classes =  topo[2]
 			input_size = 1
 			hidden_state = hidden_size = 10
-
 		"""
 		super(Model, self).__init__()
 		# assuming num_dicrections to be 1 for all the cases
@@ -194,7 +193,7 @@ class Model(nn.Module):
 		# else:
 		# print(f"param given into evaluate proposal: {w['rnn.weight_ih_l0'][:4].T}")
 		
-		self.loadparameters(copy.deepcopy(w))
+		self.loadparameters(w)
 		# print(f"param of model class: {self.state_dict()}")
 		y_pred = self.forward(x)
 
@@ -202,12 +201,19 @@ class Model(nn.Module):
 		return copy.deepcopy(np.array(y_pred.detach()))
 
 	def langevin_gradient(self,x,y,w,optimizer):
+		
+
 		try:
-			# self.loadparameters(torch.load('parameters.pt'))
-			self.loadparameters(w)
+			self.loadparameters(torch.load('parameters.pt'))
+			#self.loadparameters(w)
 		except:
 			self.loadparameters(w)
+
+
 		criterion = torch.nn.MSELoss()
+
+
+
 		# if self.optimizer == 'SGD':
 		# 	optimizer = torch.optim.SGD(self.parameters(),lr = self.lrate)
 		# elif self.optimizer == 'Adam':
@@ -244,23 +250,22 @@ class Model(nn.Module):
 				output = output.reshape(outmain[i].shape)
 				outmain[i,] = copy.deepcopy(output.detach())
 
-		loss_val = criterion(outmain,torch.FloatTensor(y))
-		print(f'root of MSEloss for k = {k}: {np.sqrt(loss_val.detach().numpy())}')
+			loss_val = criterion(outmain,torch.FloatTensor(y))
+			print(f'root of MSEloss for k = {k}: {np.sqrt(loss_val.detach().numpy())}')
 
+
+		actual = y 
+		pred = outmain.detach().numpy()
+ 
+		
+		'''step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
+		new_rmse = np.mean(step_wise_rmse)
+		print(f'rmse as calculated in mcmc.rmse():{new_rmse}')'''
 
 		parameters = copy.deepcopy(self.state_dict())
-		
-		actual = y
-		pred = outmain
-		# print(actual.shape)
-		# print(outmain.shape)
-		if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
-		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred.numpy(), axis = 2)
-		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
-		new_rmse = np.mean(step_wise_rmse)
-		# print(f'rmse as calculated in mcmc.rmse():{new_rmse}')
 
-		# torch.save(parameters,'parameters.pt')
+		#torch.save(parameters,'parameters.pt')
+
 		return parameters
 	#returns a np arraylist of weights and biases -- layerwise
 	# in order i.e. weight and bias of input and hidden then weight and bias for hidden to out
@@ -309,8 +314,7 @@ class MCMC:
 			'test_y' : testy.shape,
 		}
 		self.rnn = Model(topology,learn_rate,batch_size= self.batch_size, input_size= 1,rnn_net=self.rnn_net, optimizer = self.optimizer)
-		self.use_langevin_gradients  =  use_langevin_gradients
-		# self.use_langevin_gradients  =  False 
+		self.use_langevin_gradients  =  use_langevin_gradients 
 
 		self.l_prob = l_prob # likelihood prob
 
@@ -322,11 +326,6 @@ class MCMC:
 		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred, axis = 2)
 		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
 		new_rmse = np.mean(step_wise_rmse)
-		print("inside rmse function: ")
-		loss2 = torch.nn.MSELoss()
-		loss_val2 = loss2(torch.FloatTensor(copy.deepcopy	(pred)), torch.FloatTensor(copy.deepcopy(actual)))
-		print(f'loss function of torch: {np.sqrt(loss_val2.detach())}')
-		print(f'new_rmse: {new_rmse}')
 		return new_rmse
 
 	def step_wise_rmse(self, pred, actual):
@@ -337,25 +336,25 @@ class MCMC:
 
 
 	def likelihood_func(self, rnn,x,y, w, tau_sq, temp):
-		# fx = rnn.evaluate_proposal(x,w)
-		# rnn.loadparameters(w)
-		try:
-			torch.load('parameters.pt')
-			# rnn.load_state_dict(w)
-		except:
-			rnn.load_state_dict(w)
-		fx = copy.deepcopy(np.array(rnn.forward(x).detach()))
-		# print(fx.shape)
-		# print(y.shape)
+		
+		
+		#rnn.loadparameters(w) 
+
+		#fx = copy.deepcopy(np.array(rnn.forward(x).detach()))
+
+		fx = rnn.evaluate_proposal(x,w)
+	 
 		
 		rmse = self.rmse(fx, y)
-		# print(f'rmse as calculated in likelihood func:{rmse}')
+		#print(f'rmse as calculated in likelihood func:{rmse}')
 		step_wise_rmse = self.step_wise_rmse(fx,y) 
 		n = y.shape[0] * y.shape[1]
 		p1 = -(n/2)*np.log(2*math.pi*tau_sq) 
 		p2 = (1/(2*tau_sq)) 
 		log_lhood = p1 -  (p2 * np.sum(np.square(y -fx)) )
-		pseudo_loglhood =  log_lhood/temp       
+		pseudo_loglhood =  log_lhood/temp  
+
+    
 		return [pseudo_loglhood, fx, rmse, step_wise_rmse]
 
 	def prior_likelihood(self, sigma_squared, nu_1, nu_2, w,  tausq,rnn):  #leave this tausq as it is
@@ -383,7 +382,6 @@ class MCMC:
 		rmse_test = np.zeros(samples)
 
 		w = copy.deepcopy(rnn.state_dict())
-		print("w values captured before loop starts: ",w['rnn.weight_ih_l0'][:5].T)
 		eta = 0 #Junk variable
 		step_w = 0.025
 		step_eta = 0.2
@@ -406,11 +404,6 @@ class MCMC:
 		# print("prior current shape ", prior_current)
 		[likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w, tau_pro, temp= 1)
 		[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w, tau_pro, temp= 1)
-		
-		
-		print(w['rnn.weight_ih_l0'][:5].T)
-		
-		
 		prop_list = np.zeros((samples,w_size))
 		likeh_list = np.zeros((samples,2)) # one for posterior of likelihood and the other for all proposed likelihood
 		likeh_list[0,:] = [-100, -100] # to avoid prob in calc of 5th and 95th percentile later
@@ -431,30 +424,13 @@ class MCMC:
 		# print(f'weights before loop: {w["rnn.weight_ih_l0"][:4].T}')
 		for i in range(samples-1):  # Begin sampling --------------------------------------------------------------------------
 			timer1 = time.time()
-			print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
 			lx = np.random.uniform(0,1,1)
-			# print(w['rnn.weight_ih_l0'][:4].T)
-			# old_w = rnn.state_dict()
+			# print(w['rnn.weight_ih_l0'][:4].T) 
 			if (self.use_langevin_gradients is True) and (lx< self.l_prob):
 				w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w),optimizer= optimizer ) # Eq 8
-				print(w['rnn.weight_ih_l0'][:5].T)
-				outmain = rnn.forward(self.train_x)
-				actual = self.train_y
-				pred = outmain
-				# print(actual.shape)
-				# print(outmain.shape)
-				if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
-				if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred.numpy(), axis = 2)
-				step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0, keepdims= True))
-				new_rmse = np.mean(step_wise_rmse)
-				# print("..................: ", new_rmse)
-				
-				
 				# w_gd = torch.load('parameters.pt')
 				w_proposal = rnn.addnoiseandcopy(w_gd,0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
-				print(w['rnn.weight_ih_l0'][:5].T)
 				w_prop_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w_proposal),optimizer= optimizer)
-				print(w['rnn.weight_ih_l0'][:5].T)
 				# w_prop_gd = torch.load('parameters.pt')
 				#first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat))
 				#second = np.log(multivariate_normal.pdf(w_proposal , w_gd , sigma_diagmat)) # this gives numerical instability - hence we give a simple implementation next that takes out log
@@ -468,16 +444,15 @@ class MCMC:
 			else:
 				diff_prop = 0
 				w_proposal = rnn.addnoiseandcopy(w,0,step_w) #np.random.normal(w, step_w, w_size)
-				print(w['rnn.weight_ih_l0'][:5].T)
-
-			# print(f'w_proposal: {w_proposal["rnn.weight_ih_l0"][:4].T}')
+			
+ 
 
 			eta_pro = eta + np.random.normal(0, step_eta, 1)
 			tau_pro = np.exp(eta_pro)
 
 			[likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w_proposal,tau_pro, temp= 1)
 			[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w_proposal,tau_pro, temp= 1)
-			print(w['rnn.weight_ih_l0'][:5].T)
+				
 			prior_prop = self.prior_likelihood(sigma_squared, nu_1, nu_2, w_proposal,tau_pro, rnn)  # takes care of the gradients
 			diff_prior = prior_prop - prior_current
 			diff_likelihood = likelihood_proposal - likelihood
@@ -491,17 +466,15 @@ class MCMC:
 			# if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
 			# 	x = 0
 			u = np.log(random.uniform(0, 1))
-			# u = 0
 			# u = random.uniform(0,1)
-			print("mh_prob: ",mh_prob)
+
 			prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
-			if u > mh_prob:
+			if u < mh_prob:
 				num_accepted  =  num_accepted + 1
 				likelihood = likelihood_proposal
 				prior_current = prior_prop
-				# w = copy.deepcopy(torch.load('parameters.pt'))
-				w = copy.deepcopy(w_proposal)
+				w = copy.deepcopy(torch.load('parameters.pt'))
 				eta = eta_pro
 				# acc_train[i+1,] = 0
 				# acc_test[i+1,] = 0
@@ -512,20 +485,16 @@ class MCMC:
 				rmse_test[i + 1,] = rmsetest
 				step_wise_rmse_test[i+1,] = step_wise_rmsetest  
 
-				print(f"if accepted w becomes: {w['rnn.weight_ih_l0'][:5].T}")        
-			else:
-				# w = old_w
+				# print(f"if accepted w becomes: {w['rnn.weight_ih_l0'][:4].T}")        
+			else: 
 				pos_w[i+1,] = pos_w[i,]
 				rmse_train[i + 1,] = rmse_train[i,]
 				step_wise_rmse_train[i+1,] = step_wise_rmse_train[i,]
 				rmse_test[i + 1,] = rmse_test[i,]
 				step_wise_rmse_test[i+1,] = step_wise_rmse_test[i,]
-				print(f"if rejected w becomes: {w['rnn.weight_ih_l0'][:5].T}")
+				# print(f"if rejected w becomes: {w['rnn.weight_ih_l0'][:4].T}")
 				# acc_train[i+1,] = acc_train[i,]
 				# acc_test[i+1,] = acc_test[i,]
-
-			print(f"w_proposal was: {w_proposal['rnn.weight_ih_l0'][:5].T}")
-
 		path = self.path
 		directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
 							# path+'/surrogate/learnsurrogate_data', 
@@ -818,6 +787,3 @@ def main():
 		# outres_db.close()
 
 if __name__ == "__main__": main()
-
-# pos_w, fx_train, fx_test, rmse_train, rmse_test, indiv_rmse_train, indiv_rmse_test, likelihood_rep, swap_perc, accept_vec, accept = pt.run_chains()
-		
