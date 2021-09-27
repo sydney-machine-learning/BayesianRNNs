@@ -490,7 +490,7 @@ class MCMC:
 			print(mh_prob,'.....................')
 			prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
-			if u > mh_prob:
+			if u < mh_prob:
 				num_accepted  =  num_accepted + 1
 				likelihood = likelihood_proposal
 				prior_current = prior_prop
