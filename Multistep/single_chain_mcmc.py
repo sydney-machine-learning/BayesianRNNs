@@ -22,7 +22,7 @@ parser.add_argument('-s','--samples', help='Number of samples', default=100, des
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default = 0.5,type=float)
 # parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
 parser.add_argument('-step','--step', help='Step size for proposals (0.02, 0.05, 0.1 etc)', dest="step_size",default=0.025,type=float)
-parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.01,type=float)
+parser.add_argument('-lr','--learn', help='learn rate for langevin gradient', dest="learn_rate",default=0.05,type=float)
 parser.add_argument('-m','--model', help='1 to select RNN, 2 to select LSTM', dest = "net", default = 2, type= int)
 parser.add_argument('-o','--optim', help='1 to select SGD, 2 to select Adam', dest = 'optimizer', default = 2, type = int)
 parser.add_argument('-debug','--debug', help='debug = 0 or 1; when 1 trace plots will not be produced', dest= 'DEBUG', default= 1, type= bool)
@@ -429,9 +429,19 @@ class MCMC:
 			lx = np.random.uniform(0,1,1)
 			# print(w['rnn.weight_ih_l0'][:4].T) 
 			if (self.use_langevin_gradients is True) and (lx< self.l_prob):
+
+				#[likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, copy.deepcopy(w),tau_pro, temp= 1)
+
+				#print(likelihood_proposal, rmsetrain, ' * before * ')
+
 				w_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w),optimizer= optimizer ) # Eq 8
 				# w_gd = torch.load('parameters.pt')
 				w_proposal = rnn.addnoiseandcopy(w_gd,0,step_w) #np.random.normal(w_gd, step_w, w_size) # Eq 7
+
+				#[likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, copy.deepcopy(w_proposal),tau_pro, temp= 1)
+
+				#print(likelihood_proposal, rmsetrain, ' ** after ** ')
+
 				w_prop_gd = rnn.langevin_gradient(self.train_x,self.train_y, copy.deepcopy(w_proposal),optimizer= optimizer)
 				# w_prop_gd = torch.load('parameters.pt')
 				#first = np.log(multivariate_normal.pdf(w , w_prop_gd , sigma_diagmat))
@@ -488,7 +498,7 @@ class MCMC:
 				eta = eta_pro
 				# acc_train[i+1,] = 0
 				# acc_test[i+1,] = 0
-				print(i,'RMSE Train: ',rmsetrain,"RMSE Test: ", rmsetest,' accepted')
+				print(i, likelihood_proposal ,rmsetrain,  rmsetest,' accepted')
 				pos_w[i+ 1,] = rnn.getparameters(w_proposal).reshape(-1)
 				rmse_train[i + 1,] = rmsetrain
 				step_wise_rmse_train[i+1,] = step_wise_rmsetrain
@@ -551,7 +561,7 @@ def main():
 	print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_single_chain/')
 
 	
-	for j in [1] :
+	for j in [1, 2, 3] :
 	# for j in [2]:
 		print(j, ' out of 15','\n\n\n')
 		#i = j//2
@@ -647,7 +657,7 @@ def main():
 		# resultingfile = open( path+'/master_result_file.txt','a+')
 		# resultingfile_db = open( path_db+'/master_result_file.txt','a+')
 		timer = time.time()
-		langevin_prob = 0.9
+		langevin_prob = 0
 
 		mcmc = MCMC(use_langevin_gradients, l_prob = langevin_prob,
 					learn_rate = learn_rate, samples= NumSample,trainx= train_x, 
