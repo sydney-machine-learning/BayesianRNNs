@@ -29,6 +29,26 @@ parser.add_argument('-debug','--debug', help='debug = 0 or 1; when 1 trace plots
 args = parser.parse_args()
 
 
+def custom_rmse(pred, actual):
+	print(pred.shape[2])
+	print(actual.shape)
+
+	actual = np.squeeze(actual,axis = 2)
+	pred = np.squeeze(pred, axis = 2)
+	step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0))
+	# old_rmse = np.sqrt(((pred-actual)**2).mean())
+	# print(f"old rmse in code: {old_rmse}")
+	new_rmse = np.mean(step_wise_rmse)
+	# print(f'custom_rmse : {new_rmse}')
+	return new_rmse
+
+def torch_rmse(pred, actual):
+	criterion = torch.nn.MSELoss()
+	loss_val = criterion(torch.FloatTensor(pred),torch.FloatTensor(actual))
+	rmse = np.sqrt(loss_val.detach().numpy())
+	# print(f'torch_rmse: {rmse}')
+	return rmse
+
 
 def histogram_trace(pos_points, fname): # this is function to plot (not part of class)
 
@@ -139,15 +159,22 @@ class Model(nn.Module):
 			self.hidden = torch.ones(self.n_layers, self.batch_size, self.hidden_dim)
 			self.rnn = nn.RNN(input_size = self.input_size, hidden_size = topo[1], num_layers = self.n_layers, batch_first= True)
 		if rnn_net == 'LSTM':
-			self.hidden = (torch.ones((self.n_layers,self.batch_size,self.hidden_dim)), torch.ones((self.n_layers,self.batch_size,self.hidden_dim)))
+			# self.hidden = (torch.ones((self.n_layers,self.batch_size,self.hidden_dim)), torch.ones((self.n_layers,self.batch_size,self.hidden_dim)))
 			self.rnn = nn.LSTM(input_size = self.input_size, hidden_size = topo[1],num_layers= self.n_layers, batch_first= True)
 			# Fully connected layer
-		self.fc = nn.Linear(topo[1],topo[2])
+		self.fc = nn.Linear(topo[1],topo[2])#10,10
 		self.topo = topo
 		print(rnn_net, ' is rnn net')
 	def sigmoid(self, z):
 		return 1/(1+torch.exp(-z))
 			 
+
+
+	# input(100,5,1)---->lstm----(out, (h1,c1))
+	#                                   |_____
+	#                                          h1--->fc--->output
+
+	
 
 	def forward(self, x):
 		# print(x.shape)
@@ -159,11 +186,14 @@ class Model(nn.Module):
 			sample = sample.view(1,self.input_seq_len, self.input_size)
 			# sample = sample.view(sample.shape[0],1,self.topo[0])
 			hidden = copy.deepcopy(self.hidden)
+			#size of hidden: 1,1,10
 			if self.rnn_net == 'LSTM':
 				out, (h1,c1) = self.rnn(sample, hidden)
 			elif self.rnn_net == 'RNN':
 				out, h1 = self.rnn(sample, hidden)
+			print(h1.shape)
 			h1 = h1.view(-1, self.hidden_dim)
+			print(h1.shape)
 			output = self.fc(h1)
 			output = self.sigmoid(output)
 			output = output.reshape(outmain[i].shape)
@@ -406,6 +436,9 @@ class MCMC:
 		# print("prior current shape ", prior_current)
 		[likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w, tau_pro, temp= 1)
 		[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w, tau_pro, temp= 1)
+		print(f'before the loop starts: {custom_rmse(pred_train, y_train)}')
+		print(f'before the loop starts: {torch_rmse(pred_train, y_train)}')
+		
 		prop_list = np.zeros((samples,w_size))
 		likeh_list = np.zeros((samples,2)) # one for posterior of likelihood and the other for all proposed likelihood
 		likeh_list[0,:] = [-100, -100] # to avoid prob in calc of 5th and 95th percentile later
@@ -428,6 +461,7 @@ class MCMC:
 			timer1 = time.time()
 			lx = np.random.uniform(0,1,1)
 			# print(w['rnn.weight_ih_l0'][:4].T) 
+			print(lx, self.use_langevin_gradients, self.l_prob)
 			if (self.use_langevin_gradients is True) and (lx< self.l_prob):
 
 				#[likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, copy.deepcopy(w),tau_pro, temp= 1)
@@ -465,7 +499,10 @@ class MCMC:
 
 			[likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(rnn, self.train_x, y_train, w_proposal,tau_pro, temp= 1)
 			[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(rnn, self.test_x, y_test, w_proposal,tau_pro, temp= 1)
-				
+
+			print(f'After Langevin_gradient/random walk: {custom_rmse(pred_train, y_train)}')
+			print(f'After langevin_gradient/random walk: {torch_rmse(pred_train, y_train)}')
+
 			prior_prop = self.prior_likelihood(sigma_squared, nu_1, nu_2, w_proposal,tau_pro, rnn)  # takes care of the gradients
 			diff_prior = prior_prop - prior_current
 			diff_likelihood = likelihood_proposal - likelihood
@@ -479,18 +516,18 @@ class MCMC:
 			# if (i % batch_save+1) == 0: # just for saving posterior to file - work on this later
 			# 	x = 0
 			u = np.log(random.uniform(0, 1))
-			print("why mh_prob is quite a large number?")
-			print(diff_likelihood)
-			print(diff_prior)
-			print(diff_prop)
-			print('first',first)
-			print('second',second)
+			# print("why mh_prob is quite a large number?")
+			# print(diff_likelihood)
+			# print(diff_prior)
+			# print(diff_prop)
+			# print('first',first)
+			# print('second',second)
 			
 			# u = random.uniform(0,1)
-			print(mh_prob,'.....................')
+			# print(mh_prob,'.....................')
 			prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
-			if u < mh_prob:
+			if u > mh_prob:
 				num_accepted  =  num_accepted + 1
 				likelihood = likelihood_proposal
 				prior_current = prior_prop
@@ -515,6 +552,8 @@ class MCMC:
 				# print(f"if rejected w becomes: {w['rnn.weight_ih_l0'][:4].T}")
 				# acc_train[i+1,] = acc_train[i,]
 				# acc_test[i+1,] = acc_test[i,]
+
+			print("...............................loop ends..................................")
 		path = self.path
 		directories = [  path+'/predictions/', path+'/posterior', path+'/results', #path+'/surrogate', 
 							# path+'/surrogate/learnsurrogate_data', 
@@ -657,7 +696,7 @@ def main():
 		# resultingfile = open( path+'/master_result_file.txt','a+')
 		# resultingfile_db = open( path_db+'/master_result_file.txt','a+')
 		timer = time.time()
-		langevin_prob = 0
+		langevin_prob = 9
 
 		mcmc = MCMC(use_langevin_gradients, l_prob = langevin_prob,
 					learn_rate = learn_rate, samples= NumSample,trainx= train_x, 

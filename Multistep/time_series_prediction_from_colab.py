@@ -16,13 +16,15 @@ from torch.autograd import Variable
 from sklearn.preprocessing import MinMaxScaler
 import os
 import math
+import copy
+from copy import deepcopy
 
 # from google.colab import drive
 # drive.mount('/content/drive')
 
-training_set = pd.read_csv('./data/Sunspot/train1.csv',index_col=0)
+training_set = pd.read_csv('./data/Lazer/train1.csv',index_col=0)
 training_set = training_set.values
-test_set = pd.read_csv('./data/Sunspot/test1.csv',index_col=0)
+test_set = pd.read_csv('./data/Lazer/test1.csv',index_col=0)
 test_set = test_set.values
 
 
@@ -93,6 +95,24 @@ class LSTM(nn.Module):
         
         return out
 
+
+def custom_rmse(pred, actual):
+	# actual = np.squeeze(actual,axis = 2)
+	# pred = np.squeeze(pred, axis = 2)
+	step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0))
+	# old_rmse = np.sqrt(((pred-actual)**2).mean())
+	# print(f"old rmse in code: {old_rmse}")
+	new_rmse = np.mean(step_wise_rmse)
+	print(f'custom_rmse : {new_rmse}')
+	return new_rmse
+
+def torch_rmse(pred, actual):
+	criterion = torch.nn.MSELoss()
+	loss_val = criterion(torch.FloatTensor(pred),torch.FloatTensor(actual))
+	rmse = np.sqrt(loss_val.detach().numpy())
+	print(f'torch_rmse: {rmse}')
+	return rmse
+
 def rmse( pred, actual):
         if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
         if len(pred.shape) > 2 and actual.shape[2]==1: pred = np.squeeze(pred, axis = 2)
@@ -158,12 +178,16 @@ for epoch in range(num_epochs):
     
     # obtain the loss function
     loss = criterion(outputs, trainY)
+ 
+    print("Custom rmse(mean of step wise rmse): ", custom_rmse(outputs.detach().numpy(),trainY.numpy()))
     
     loss.backward()
     
     optimizer.step()
     if epoch % 5 == 0:
-      print("Epoch: %d, loss: %1.5f" % (epoch, loss.item()))
+      print("Epoch: %d, loss using torch MSELoss(): %f" % (epoch, np.sqrt(loss.item())))
+
+    print(".................................epoch end...............................")
 
 lstm.eval()
 dataX = Variable(torch.Tensor(np.concatenate((trainX,testX))))
