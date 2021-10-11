@@ -72,8 +72,8 @@ class Model(nn.Module):
 
 	#vectorized version: 
 	def forward(self, x):
-		h_0 = Variable(torch.zeros(self.n_layers, x.size(0), 10))
-		c_0 = Variable(torch.zeros(self.n_layers, x.size(0), 10))
+		h_0 = Variable(torch.zeros(self.n_layers, x.shape[0], self.hidden_dim))
+		c_0 = Variable(torch.zeros(self.n_layers, x.shape[0], self.hidden_dim))
 
 		batch_size = len(x)
 		output_size = self.topo[2]
@@ -82,17 +82,20 @@ class Model(nn.Module):
 		if(self.rnn_net == 'RNN'):
 			ula, h_out = self.rnn(x, h_0)
 		elif(self.rnn_net == 'LSTM'):
-			ula, (h_out, _) = self.rnn(x,(h_0, c_0))
+			# ula, (h_out, _) = self.rnn(x,(h_0, c_0))
+			ula, (h_out, _) = self.rnn(x)
 			h_out = h_out.view(-1, self.hidden_dim)
 			
 		out = self.fc(h_out)
-		return out
-
+		out = out.view(x.shape[0], self.num_outputs, 1)
+		return out #returning the output tensor directly without detaching or deep copying
+		
 
 	def langevin_gradient(self, x, y, w, optimizer):
-		
+		self.load_state_dict(w)
+
 		criterion = torch.nn.MSELoss()
-		for k in range(1):
+		for k in range(10):
 			output = self.forward(x)
 			optimizer.zero_grad()
 			loss = criterion(output, y.view(output.shape))
@@ -100,16 +103,20 @@ class Model(nn.Module):
 			loss.backward()
 			optimizer.step()
 
+			print(f'root of MSEloss for k = {k}: {np.sqrt(loss.detach().numpy())}')
+
 		parameters = self.state_dict()
 		return parameters 
-		# Retuning the parameters directly..... no deepcopy
+		# Retuning the parameters directly..... no deepcopy, no detach.
+		# The change are made directly into the w parameter as well.
+		# The w parameter is already being passed in as a deepcopy of its original.
 		
 	def evaluate_proposal(self, x, w):
 		backup = copy.deepcopy(self.state_dict())
 		self.load_state_dict(w)
 		y_pred = self.forward(x)
 		self.load_state_dict(backup)
-		return copy.deepcopy(np.array(y_pred.detach()))
+		return copy.deepcopy(y_pred.detach().numpy())
 
 	def addnoiseandcopy(self, w, mean, std_dev):
 		d = dict()
@@ -126,45 +133,54 @@ class Model(nn.Module):
 			dic = copy.deepcopy(w)
 		for name in sorted(dic.keys()):
 			l = np.concatenate((l, np.array(copy.deepcopy(dic[name])).reshape(-1)),axis= None)
-	l = l[2:]
-	return l
+		l = l[2:]
+		return l
 
 
-def MCMC():
-	def __init__(self, use_langevin_gradients, l_prob, learn_rate, samples, trainx, trainy, testx, testy, topology, path, rnn_net = 'LSTM', optimizer = 'Adam'):
+class MCMC:
+	def __init__(self, use_langevin_gradients, l_prob, learn_rate, samples, trainx, trainy, testx, testy, topology, path= None, rnn_net = 'LSTM', optimizer = 'Adam'):
 		self.samples = samples
 		self.topology = topology
-		self.train_x = trainx
-		self.train_y = trainy
-		self.test_x = testx
-		self.test_y = testy
+		self.train_y = torch.FloatTensor(trainy)
+		self.train_x = torch.FloatTensor(trainx)
+		self.test_x = torch.FloatTensor(testx)
+		self.test_y = torch.FloatTensor(testy)
 		self.rnn_net = rnn_net
 		self.path = path
 		self.optimizer = optimizer
 		self.use_langevin_gradients = use_langevin_gradients
 		self.l_prob = l_prob
 		self.learn_rate = learn_rate
-		self.rnn_model = Model(topo = topology, lrate = learn_rate, input_size=1, rnn_net = rnn_net, optimizer= optimizer)
+		self.rnn = Model(topo = topology, lrate = learn_rate, input_size=1, rnn_net = rnn_net, optimizer= optimizer)
 
 	def rmse(self, pred, actual):
-		pass
+		if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
+		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred, axis = 2)
+		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0))
+		return np.mean(step_wise_rmse)
 
 	def step_wise_rmse(self, pred, actual):
-		pass
+		if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
+		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred, axis = 2)
+		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0))
+		return np.sqrt(np.mean((pred - actual)**2, axis = 0))
 
-	
 	def likelihood_func(self, rnn, x, y, w, tau_sq, temp):
 		fx = rnn.evaluate_proposal(x, w)
+		y = y.numpy()
 		rmse = self.rmse(fx, y)
 		step_wise_rmse = self.step_wise_rmse(fx, y)
 		n = y.shape[0]* y.shape[1]
 		p1 = -(n/2)*np.log(2*math.pi*tau_sq)
 		p2 = (1/(2*tau_sq))
-		log_lhood = p1  (p22*np.sum(np.square(y-fx)))
+		# print("is this it?",(y-fx).shape)
+		# print(p1.shape)
+		# print(np.sum(np.square(y-fx)))
+		log_lhood = p1 - (p2*np.sum(np.square(y-fx)))
 		pseudo_loglhood = log_lhood/temp
 		return [pseudo_loglhood, fx, rmse, step_wise_rmse]
 
-	def prior_likelihood(self, sigma_squared, nu_1, nu_2 ,w, tau_sq, rnn):
+	def prior_likelihood(self, sigma_squared, nu_1, nu_2 ,w, tausq, rnn):
 		h = self.topology[1]
 		d = self.topology[0]
 		part1 = -1 * ((len(rnn.getparameters(w))) / 2) * np.log(sigma_squared)
@@ -173,28 +189,29 @@ def MCMC():
 		return log_loss
 
 	def sampler(self):
-		w_size = sum(p.numel() for p in rnn.parameters())
+		w_size = sum(p.numel() for p in self.rnn.parameters())
 		pos_w = np.ones((self.samples, w_size))
 		step_wise_rmse_train = np.zeros(shape = (self.samples,10))
 		step_wise_rmse_test  = np.zeros(shape = (self.samples,10))
 		rmse_train  = np.zeros(self.samples)
 		rmse_test = np.zeros(self.samples)
 		prop_list = np.zeros((self.samples, w_size))
-		likeh_list = np.zeros((self.samples, ))
+		likeh_list = np.zeros((self.samples,2 ))
 		likeh_list[0,:] = [-100,-100]
 		accept_list = np.zeros(self.samples)
 		num_accepted = 0
 		langevin_count = 0
 		pt_samples = self.samples*args.burn_in
 		init_count = 0
-		if self.optimizer is 'SGD':
+		if self.optimizer == 'SGD':
 			optimizer = torch.optim.SGD(self.rnn.parameters(), lr= self.learn_rate)
-		elif self.optimizer is 'Adam':
+		elif self.optimizer == 'Adam':
 			optimizer = torch.optim.Adam(self.rnn.parameters(), lr= self.learn_rate)
 
-		pred_train = self.rnn.evaluate_proposal(x_train, w)
-		pred_test = self.rnn.evaluate_proposal(x_test, w)
-		eta = np.log(np.var(pred_train - np.array(y_train)))
+		w = copy.deepcopy(self.rnn.state_dict())
+		pred_train = self.rnn.evaluate_proposal(self.train_x, w)
+		pred_test = self.rnn.evaluate_proposal(self.test_x, w)
+		eta = np.log(np.var(pred_train - np.array(self.train_y)))
 		tau_pro = np.exp(eta)
 
 		eta = 0
@@ -203,7 +220,7 @@ def MCMC():
 		sigma_squared = 25
 		nu_1 = 0
 		nu_2 = 0
-		w = copy.deepcopy(self.rnn.state_dict())
+		
 		sigma_diagmat = np.zeros((w_size, w_size))
 		np.fill_diagonal(sigma_diagmat, step_w**2)
 		prior_current = self.prior_likelihood(sigma_squared, nu_1, nu_2, w, tau_pro, self.rnn)
@@ -219,7 +236,7 @@ def MCMC():
 				w_proposal = self.rnn.addnoiseandcopy(w_gd, 0, step_w)
 				w_prop_gd = copy.deepcopy(self.rnn.langevin_gradient(self.train_x, self.train_y, copy.deepcopy(w_proposal), optimizer= optimizer))
 				wc_delta = self.rnn.getparameters(w) - self.rnn.getparameters(w_prop_gd)
-				wp_delta = self.rnn.getparameter(w_proposal) - self.rnn.getparameters(w_gd)
+				wp_delta = self.rnn.getparameters(w_proposal) - self.rnn.getparameters(w_gd)
 				sigma_sq = step_w**2
 				first = -0.5 * np.sum(wc_delta  *  wc_delta  ) / sigma_sq  # this is wc_delta.T  *  wc_delta /sigma_sq
 				second = -0.5 * np.sum(wp_delta * wp_delta ) / sigma_sq
@@ -246,7 +263,7 @@ def MCMC():
 
 			accept_list[i+1] = num_accepted
 			u = np.log(random.uniform(0,1))
-			prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
+			prop_list[i+1,] = self.rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
 			if u > mh_prob:
 				num_accepted = num_accepted + 1
@@ -255,7 +272,7 @@ def MCMC():
 				w = copy.deepcopy(w_proposal)
 				eta = eta_pro 
 				print(i, likelihood_proposal, rmsetrain, rmsetest, ' accepted!')
-				pos_w[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
+				pos_w[i+1,] = self.rnn.getparameters(w_proposal).reshape(-1)
 				rmse_train[i + 1,] = rmsetrain
 				step_wise_rmse_train[i+1,] = step_wise_rmsetrain
 				rmse_test[i + 1,] = rmsetest
@@ -339,6 +356,9 @@ def main():
 		test_y = test_y.reshape(test_y.shape[0],test_y.shape[1],1)
 		print("shapes of train x and y",train_x.shape,train_y.shape)
 
+		a = torch.FloatTensor(train_x)
+		print(a.numpy())
+
 		Hidden = 10 #originally it was 5; but in the paper to compare it is 10
 		topology = [n_steps_in, Hidden,n_steps_out]
 		NumSample = args.samples
@@ -348,8 +368,18 @@ def main():
 		use_langevin_gradients = True
 		print(f'Langevin is {use_langevin_gradients}')
 
-		langevin_prob = 9
-		
-		
+		langevin_prob = 0.9
+		path = None
+
+		# mcmc = MCMC(use_langevin_gradients, langevin_prob,
+		# 			learn_rate, NumSample, train_x, 
+		# 			train_y, test_x, test_y,
+		# 			topology,path, net, optimizer)
+		mcmc = MCMC(use_langevin_gradients, l_prob = langevin_prob,
+					learn_rate = learn_rate, samples= NumSample,trainx= train_x, 
+					trainy= train_y, testx= test_x, testy= test_y,
+					topology= topology,path = path, rnn_net = net, optimizer= optimizer)
+		[pos_w, rmse_train, indiv_rmse_train, rmse_test, indiv_rmse_test ,accept_vec, accept_ratio, likelihood] = mcmc.sampler()
+
 
 if __name__ == "__main__":main()
