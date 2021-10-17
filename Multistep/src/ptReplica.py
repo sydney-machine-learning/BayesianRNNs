@@ -118,7 +118,7 @@ class ptReplica(multiprocessing.Process):
 		[likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(self.rnn, self.train_x, self.train_y, copy.deepcopy(w), tau_pro, temp=self.temperature)
 		[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(self.rnn, self.test_x, self.test_y, copy.deepcopy(w), tau_pro, temp=self.temperature)
 		
-		scaling_factor = 0.01 #0.05 works great too
+		scaling_factor = 0.05 #0.05 works great too
 		self.event.clear()
 		i = 0 
 		for i in range(self.samples -1):
@@ -153,7 +153,7 @@ class ptReplica(multiprocessing.Process):
 			tau_pro = np.exp(eta_pro)
 
 			[likelihood_proposal, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(self.rnn, self.train_x, self.train_y, copy.deepcopy(w_proposal), tau_pro, temp=self.adapttemp)
-			[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(self.rnn, self.train_x, self.train_y, copy.deepcopy(w_proposal), tau_pro, temp=self.adapttemp)
+			[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(self.rnn, self.test_x, self.test_y, copy.deepcopy(w_proposal), tau_pro, temp=self.adapttemp)
 
 			prior_prop = self.prior_likelihood(sigma_squared, nu_1, nu_2, w_proposal, tau_pro, self.rnn)
 			diff_prior = prior_prop - prior_current
