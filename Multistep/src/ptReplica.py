@@ -16,15 +16,16 @@ class ptReplica(multiprocessing.Process):
 		multiprocessing.Process.__init__(self)
 		self.processID = temperature 
 		self.parameter_queue = parameter_queue 
-		self.signam_main = main_process 
+		self.signal_main = main_process 
 		self.event = event 
-		self.rnn = Model(topology, learn_rate, input_size = 1, rnn_net = rnn_net, optimzer = optimizer)
+		self.rnn = Model(topology, learn_rate, input_size = 1, rnn_net = rnn_net, optimizer = optimizer)
 		self.temperature = temperature
 		self.adapttemp = temperature
 		self.swap_interval = swap_interval
 		self.path = path
 		self.burn_in = burn_in
 		self.rnn_net = rnn_net 
+		self.optimizer = optimizer
 		self.samples = samples
 		self.topology = topology
 		self.train_x = torch.FloatTensor(trainx)
@@ -120,7 +121,7 @@ class ptReplica(multiprocessing.Process):
 		scaling_factor = 0.01 #0.05 works great too
 		self.event.clear()
 		i = 0 
-		for i in range(samples -1):
+		for i in range(self.samples -1):
 			timer1 = time.time()
 			if i < pt_samples:
 				self.adapttemp = self.temperature 
@@ -134,7 +135,7 @@ class ptReplica(multiprocessing.Process):
 			if(self.use_langevin_gradients and lx < self.l_prob):
 				w_gd = copy.deepcopy(self.rnn.langevin_gradient(self.train_x, self.train_y, copy.deepcopy(w),optimizer = optimizer))
 				w_proposal = self.rnn.addnoiseandcopy(w_gd, mean = 0, std_dev=step_w)
-				w_prop_gd = copy.deepcopy(self.rnn.langevin_gradient(self.train_x, self.train_y, copy.deepcopy(w), optimzer= optimizer))
+				w_prop_gd = copy.deepcopy(self.rnn.langevin_gradient(self.train_x, self.train_y, copy.deepcopy(w), optimizer= optimizer))
 				wc_delta = self.rnn.getparameters(w) - self.rnn.getparameters(w_prop_gd)
 				wp_delta = self.rnn.getparameters(w_proposal) - self.rnn.getparameters(w_gd)
 				sigma_sq = step_w*step_w
@@ -165,7 +166,7 @@ class ptReplica(multiprocessing.Process):
 			accept_list[i+1] = num_accepted
 			u = np.log(random.uniform(0,1)) 
 
-			prop_list[i+1,] = rnn.getparameters(w_proposal).reshape(-1)
+			prop_list[i+1,] = self.rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
 			if u < mh_prob:
 				num_accepted = num_accepted + 1
@@ -190,8 +191,8 @@ class ptReplica(multiprocessing.Process):
 
 			if((i+1)% self.swap_interval == 0 and i!= 0):
 				print(str(i) + 'th sample running')
-				w_size = rnn.getparameters(copy.deepcopy(w)).reshape(-1).shape[0]
-				param = np.concatenate([rnn.getparameters(w).reshape(-1),
+				w_size = self.rnn.getparameters(copy.deepcopy(w)).reshape(-1).shape[0]
+				param = np.concatenate([self.rnn.getparameters(w).reshape(-1),
 										np.asarray([eta]).reshape(1),
 										np.asarray([likelihood*self.temperature]).reshape(-1),
 										np.asarray([self.temperature])]
@@ -209,13 +210,13 @@ class ptReplica(multiprocessing.Process):
 				param1 = self.parameter_queue.get()
 				w1 = param1[0:w_size]
 				eta = param1[w_size]
-				w1_dict = rnn.dictfromlist(w1)
-				rnn.load_state_dict(w1_dict)
+				w1_dict = self.rnn.dictfromlist(w1)
+				self.rnn.load_state_dict(w1_dict)
 
 		
 		param = np.concatenate(
 			[
-				rnn.getparameters(w).reshape(-1), 
+				self.rnn.getparameters(w).reshape(-1), 
 				np.asarray([eta]).reshape(1), 
 				np.asarray([likelihood]).reshape(1),
 				np.asarray([self.adapttemp]),
@@ -224,10 +225,10 @@ class ptReplica(multiprocessing.Process):
 		)
 		self.parameter_queue.put(param)
 		self.signal_main.set()
-		print ((num_accepted*100 / (samples * 1.0)), f'% samples out of {samples} were accepted')
-		accept_ratio = num_accepted / (samples * 1.0) * 100
-		print ((langevin_count*100 / (samples * 1.0)), '% of total samples were Langevin')
-		langevin_ratio = langevin_count / (samples * 1.0) * 100
+		print ((num_accepted*100 / (self.samples * 1.0)), f'% samples out of {self.samples} were accepted')
+		accept_ratio = num_accepted / (self.samples * 1.0) * 100
+		print ((langevin_count*100 / (self.samples * 1.0)), '% of total samples were Langevin')
+		langevin_ratio = langevin_count / (self.samples * 1.0) * 100
 		file_name = self.path+'/posterior/pos_w/'+'chain_'+ str(self.temperature)+ '.txt'
 		np.savetxt(file_name,pos_w )
 		file_name = self.path+'/predictions/rmse_test_chain_'+ str(self.temperature)+ '.txt'

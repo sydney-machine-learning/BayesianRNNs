@@ -18,17 +18,18 @@ class ParallelTempering:
 		self.topology = topology 
 		self.rnn = Model(topology, learn_rate, input_size = 1, rnn_net = rnn_net, optimizer = optimizer)
 		self.num_param = sum(p.numel() for p in self.rnn.parameters())
-
+		self.max_temp = max_temp
 		self.swap_interval = swap_interval
 		self.rnn_net = rnn_net
-		self.optimzer = optimizer
+		self.optimizer = optimizer
 		self.langevin_prob = langevin_prob
 		self.num_swap = 0
 		self.total_swap_proposals = 0
 		self.num_chains = num_chains
+		self.path = path
 		self.chains = []
 		self.temperatures = []
-		self.NumSamples = int(NumSamples/num_chains)  #means number of samples per chain
+		self.NumSamples = int(NumSample/num_chains)  #means number of samples per chain
 		self.sub_sample_size = max(1, int(0.05*NumSample))
 		self.parameter_queue = [multiprocessing.Queue() for i in range(num_chains)]
 		self.chain_queue = multiprocessing.JoinableQueue()
@@ -113,12 +114,12 @@ class ParallelTempering:
 
 	def assign_temperatures(self):
 		if self.geometric == True:
-			betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.maxtemp)
+			betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.max_temp)
 			for i in range(0, self.num_chains):
 				self.temperatures.append(np.inf if betas[i] == 0 else 1.0/betas[i])
 				#print (self.temperatures[i])
 		else:
-			tmpr_rate = (self.maxtemp /self.num_chains)
+			tmpr_rate = (self.max_temp /self.num_chains)
 			temp = 1
 			for i in range(0, self.num_chains):
 				self.temperatures.append(temp)
@@ -188,8 +189,8 @@ class ParallelTempering:
 		start = 0 
 		end = self.NumSamples - 1 
 		for l in range(0, self.num_chains):
-			self.chains[j].start_chain = start 
-			self.chains[j].end = end 
+			self.chains[l].start_chain = start 
+			self.chains[l].end = end 
 		for j in range(0, self.num_chains):
 			self.wait_chain[j].clear()
 			self.event[j].clear()

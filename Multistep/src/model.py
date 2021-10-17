@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 import copy
+from torch.autograd import Variable
 import numpy as np
 
 class Model(nn.Module):

@@ -22,7 +22,7 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=10000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=1000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
 parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
@@ -37,9 +37,9 @@ args = parser.parse_args()
 
 
 def main():
-	n_step_in, n_steps_out = 5,10
+	n_steps_in, n_steps_out = 5,10
 	net = 'RNN' if args.net ==1 else 'LSTM'
-	optimizer = 'SGD' if args.optimzer == 1 else 'Adam'
+	optimizer = 'SGD' if args.optimizer == 1 else 'Adam'
 	print(f"Network is {net} and optimizer is {optimizer}")
 	print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
@@ -105,7 +105,7 @@ def main():
 		# shapes of train x and y (585, 5) (585, 10)
 
 		Hidden = 10
-		topology = [n_step_in, Hidden, n_steps_out]
+		topology = [n_steps_in, Hidden, n_steps_out]
 		NumSample = args.samples 
 		netw = topology 
 		maxtemp = args.mt_val 
@@ -310,7 +310,7 @@ def main():
 		plt.ylabel('RMSE', fontsize=12)
 		plt.savefig(path+'/rmse_samples.pdf')
 		plt.clf()
-		likelihood = likelihood_rep[:,0] # just plot proposed likelihood
+		likelihood = likelihood_vec[:,0] # just plot proposed likelihood
 		likelihood = np.asarray(np.split(likelihood, num_chains))
 	# Plots
 		plt.plot(likelihood.T)
