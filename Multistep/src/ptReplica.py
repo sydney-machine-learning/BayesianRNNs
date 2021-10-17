@@ -24,13 +24,13 @@ class ptReplica(multiprocessing.Process):
 		self.swap_interval = swap_interval
 		self.path = path
 		self.burn_in = burn_in
-
+		self.rnn_net = rnn_net 
 		self.samples = samples
 		self.topology = topology
-		self.train_x = trainx
-		self.train_y = trainy
-		self.test_x = testx
-		self.test_y = testy
+		self.train_x = torch.FloatTensor(trainx)
+		self.train_y = torch.FloatTensor(trainy)
+		self.test_x = torch.FloatTensor(testx)
+		self.test_y = torch.FloatTensor(testy)
 		self.w = w
 		self.minY = np.zeros((1,1))
 		self.maxY = np.zeros((1,1))
