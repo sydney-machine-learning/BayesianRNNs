@@ -117,6 +117,7 @@ class ParallelTempering:
 			betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.max_temp)
 			for i in range(0, self.num_chains):
 				self.temperatures.append(np.inf if betas[i] == 0 else 1.0/betas[i])
+				# self.temperatures.append(1.0)
 				#print (self.temperatures[i])
 		else:
 			tmpr_rate = (self.max_temp /self.num_chains)

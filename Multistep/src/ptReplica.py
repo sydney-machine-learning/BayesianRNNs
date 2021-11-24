@@ -47,7 +47,10 @@ class ptReplica(multiprocessing.Process):
 		if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
 		if len(pred.shape) > 2 and pred.shape[2]==1: pred = np.squeeze(pred, axis = 2)
 		step_wise_rmse = np.sqrt(np.mean((pred - actual)**2, axis = 0))
+		# error = np.subtract(pred, actual)
+		# sqerror= np.sum(np.square(error))/actual.shape[0]
 		return np.mean(step_wise_rmse)
+		# return sqerror
 
 	def step_wise_rmse(self, pred, actual):
 		if len(actual.shape)>2 and actual.shape[2]==1: actual = np.squeeze(actual,axis = 2)
@@ -68,7 +71,12 @@ class ptReplica(multiprocessing.Process):
 		# print(np.sum(np.square(y-fx)))
 		log_lhood = p1 - (p2*np.sum(np.square(y-fx)))
 		pseudo_loglhood = log_lhood/temp
+		pseudo_loglhood = log_lhood
 		return [pseudo_loglhood, fx, rmse, step_wise_rmse]
+		# loss = np.sum(-0.5*np.log(2*math.pi*tau_sq) - 0.5 * np.square(y-fx/tau_sq))
+		# print("rmse shravan: ", rmse)
+		# print("our rmse" ,np.mean(step_wise_rmse))
+		# return [np.sum(loss) , fx, rmse, step_wise_rmse] #/ self.adapttemp
 
 	def prior_likelihood(self, sigma_squared, nu_1, nu_2 ,w, tausq, rnn):
 		h = self.topology[1]
@@ -118,7 +126,8 @@ class ptReplica(multiprocessing.Process):
 		[likelihood, pred_train, rmsetrain, step_wise_rmsetrain] = self.likelihood_func(self.rnn, self.train_x, self.train_y, copy.deepcopy(w), tau_pro, temp=self.temperature)
 		[_, pred_test, rmsetest, step_wise_rmsetest] = self.likelihood_func(self.rnn, self.test_x, self.test_y, copy.deepcopy(w), tau_pro, temp=self.temperature)
 		
-		scaling_factor = 0.05 #0.05 works great too
+		# scaling_factor = 0.05 #0.05 works great too
+		scaling_factor  = 1
 		self.event.clear()
 		i = 0 
 		for i in range(self.samples -1):
@@ -160,11 +169,15 @@ class ptReplica(multiprocessing.Process):
 			diff_likelihood = likelihood_proposal - likelihood 
 
 			try: 
-				mh_prob = diff_likelihood + diff_prior + diff_prop 
+				# mh_prob = diff_likelihood + diff_prior + diff_prop 
+				#shravan's
+				mh_prob = min(1, math.exp(diff_likelihood + diff_prior + diff_prop))
 			except OverflowError as e:
 				mh_prob = 1
 			accept_list[i+1] = num_accepted
-			u = np.log(random.uniform(0,1)) 
+			# u = np.log(random.uniform(0,1)) 
+			#shravan's 
+			u = random.uniform(0,1)
 
 			prop_list[i+1,] = self.rnn.getparameters(w_proposal).reshape(-1)
 			likeh_list[i+1,0] = likelihood_proposal
@@ -174,7 +187,13 @@ class ptReplica(multiprocessing.Process):
 				prior_current = prior_prop 
 				w = copy.deepcopy(w_proposal)
 				eta = eta_pro 
+
+
+
 				print(i, likelihood_proposal, rmsetrain, rmsetest, ' accepted!')
+				
+				
+				
 				pos_w[i+1,] = self.rnn.getparameters(w_proposal).reshape(-1)
 				rmse_train[i + 1,] = rmsetrain
 				step_wise_rmse_train[i+1,] = step_wise_rmsetrain
@@ -194,8 +213,8 @@ class ptReplica(multiprocessing.Process):
 				w_size = self.rnn.getparameters(copy.deepcopy(w)).reshape(-1).shape[0]
 				param = np.concatenate([self.rnn.getparameters(w).reshape(-1),
 										np.asarray([eta]).reshape(1),
-										np.asarray([likelihood*self.temperature]).reshape(-1),
-										np.asarray([self.temperature])]
+										np.asarray([likelihood*self.adapttemp]).reshape(-1),
+										np.asarray([self.adapttemp])]
 										)
 				self.parameter_queue.put(param)
 				self.signal_main.set()

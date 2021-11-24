@@ -22,9 +22,9 @@ mpl.use('agg')
 weightdecay = 0.01
 #Initialise and parse inputs
 parser=argparse.ArgumentParser(description='PTBayeslands modelling')
-parser.add_argument('-s','--samples', help='Number of samples', default=1000, dest="samples",type=int)
+parser.add_argument('-s','--samples', help='Number of samples', default=5000, dest="samples",type=int)
 parser.add_argument('-r','--replicas', help='Number of chains/replicas, best to have one per availble core/cpu', default=8,dest="num_chains",type=int)
-parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=2,dest="mt_val",type=int)
+parser.add_argument('-t','--temperature', help='Demoninator to determine Max Temperature of chains (MT=no.chains*t) ', default=1.1 ,dest="mt_val",type=int)
 parser.add_argument('-swap','--swap', help='Swap Ratio', dest="swap_ratio",default=0.001,type=float)
 parser.add_argument('-b','--burn', help='How many samples to discard before determing posteriors', dest="burn_in",default = 0.5,type=float)
 parser.add_argument('-pt','--ptsamples', help='Ratio of PT vs straight MCMC samples to run', dest="pt_samples",default=0.5,type=float)
@@ -43,7 +43,7 @@ def main():
 	print(f"Network is {net} and optimizer is {optimizer}")
 	print("Name of folder to look for: ",os.getcwd()+'/Res_LG-Lprob_'+net+f'_{optimizer}_{args.num_chains}chains/')
 
-	for j in [1,2,3,6] :
+	for j in [2]:
 	# for j in [2]:
 		print(j, ' out of 15','\n\n\n')
 		#i = j//2
